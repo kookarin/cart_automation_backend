@@ -87,6 +87,16 @@ interface ProductDetails {
     };
 }
 
+interface TransformedProduct {
+    product_id: string;
+    name: string;
+    brand: string;
+    unit: string;
+    mrp: number;
+    price: number;
+    discount: number;
+}
+
 // API options
 const options: RequestInit = {
     method: 'GET',
@@ -110,7 +120,8 @@ const options: RequestInit = {
 };
 
 // Helper function to extract product details
-function extractProductDetails(product: BigBasketProduct): ProductDetails {
+function extractProductDetails(product: BigBasketProduct): TransformedProduct {
+    /*
     return {
         id: product.id,
         name: product.desc,
@@ -143,10 +154,25 @@ function extractProductDetails(product: BigBasketProduct): ProductDetails {
             in_stock: product.availability?.not_for_sale === false
         }
     };
+    */
+
+    const mrp = parseFloat(product.pricing?.discount?.mrp || '0');
+    const price = parseFloat(product.pricing?.discount?.prim_price?.sp || '0');
+    const discount = mrp > 0 ? ((mrp - price) / mrp) * 100 : 0;
+
+    return {
+        product_id: product.id,
+        name: product.desc,
+        brand: product.brand?.name || '',
+        unit: product.unit || '',
+        mrp: mrp,
+        price: price,
+        discount: Math.round(discount)
+    };
 }
 
 // Main search function
-export async function searchForItem(item: string): Promise<{ products: ProductDetails[] }> {
+export async function searchForItem(item: string): Promise<{ products: TransformedProduct[] }> {
     const url = `https://www.bigbasket.com/_next/data/OlOtTlO5-yAkkTJCD7_c_/ps.json?q=${encodeURIComponent(item)}&nc=as&listing=ps`;
 
     try {
