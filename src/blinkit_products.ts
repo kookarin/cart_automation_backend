@@ -23,7 +23,7 @@ export const initializeBlinkit = async (browser: Browser) => {
     }
 };
 
-export const searchBlinkit = async (query: string): Promise<Product[]> => {
+export const searchBlinkit = async (query: string): Promise<{ [key: string]: Product[] }> => {
     if (!page) {
         throw new Error('Blinkit page not initialized');
     }
@@ -43,14 +43,15 @@ export const searchBlinkit = async (query: string): Promise<Product[]> => {
         );
         return await res.json();
     }, query);
-
-    return response.products.map(product => ({
-        product_id: product.product_id,
-        name: product.name,
-        brand: product.brand,
-        unit: product.unit,
-        mrp: product.mrp,
-        price: product.price,
-        discount: product.discount
-    }));
+    return {
+        [query]: response.products.map(product => ({
+            product_id: product.product_id,
+            name: product.name,
+            brand: product.brand,
+            unit: product.unit,
+            mrp: product.mrp,
+            price: product.price,
+            discount: product.discount
+        }))
+    };
 }; 
