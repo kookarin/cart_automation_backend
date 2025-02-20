@@ -158,8 +158,8 @@ export function transformProducts(products: ProductItem[], itemName: string): { 
                 name: product.name,
                 brand: product.brand,
                 unit: variant.formattedPacksize,
-                mrp: mrp,
-                price: price,
+                mrp: mrp / 100,
+                price: price / 100,
                 discount: discount
             };
         })
