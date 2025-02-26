@@ -23,6 +23,7 @@
   "dependencies": {
     "@langchain/azure-openai": "^0.0.11",
     "@langchain/core": "^0.3.40",
+    "@langchain/openai": "^0.4.4",
     "@types/puppeteer": "^5.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

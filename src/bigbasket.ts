@@ -93,15 +93,15 @@ interface ProductDetails {
     };
 }
 
-interface TransformedProduct {
+export interface TransformedProduct {
     product_id: string;
     name: string;
     brand: string;
-    unit: string;
-    mrp: number;
-    price: number;
-    discount: number;
     weight: string;
+    unit: string;
+    price: number;
+    mrp: number;
+    discount: number;
     available: boolean;
 }
 
