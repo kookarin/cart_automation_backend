@@ -7,6 +7,12 @@ import { searchForItem, getProductIncremental } from './bigbasket';
 import { initializeBlinkit, searchBlinkit } from './blinkit_products';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
+import { processCart } from './bb_cart_proccesor';
+// import { initializeBlinkitCart, addToBlinkitCart } from './blinkit_cart';
+import { searchSwiggyInstamart } from './swiggy_instamart';
+import { extractOrderDetails, getOrderDetails } from './order-details';
+import fs from 'fs';
+import path from 'path';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -182,113 +188,15 @@ app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
 app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
     try {
         const { house_identifier, cart } = req.body;
-        console.log('Processing cart for house:', house_identifier);
-        console.log('Cart items:', cart);
-
+        
         if (!cart || !Array.isArray(cart) || cart.length === 0) {
-            console.log('Invalid cart data');
             return res.status(400).json({ 
                 error: 'Valid cart data is required' 
             });
         }
 
-        // Results array to track processing of each item
-        const results = [];
-        let allSuccessful = true;
-
-        // Process each cart item sequentially
-        for (const item of cart) {
-            try {
-                console.log(`Processing item: ${item.ingredient}`);
-                
-                // Extract quantity value and unit
-                const quantityMatch = item.required_quantity?.match(/(\d+)\s*([a-zA-Z]+)/);
-                if (!quantityMatch) {
-                    throw new Error(`Invalid quantity format for ${item.ingredient}`);
-                }
-                
-                const quantityValue = parseInt(quantityMatch[1]);
-                const unit = quantityMatch[2];
-                console.log(`Parsed quantity: ${quantityValue} ${unit}`);
-
-                // Search for products
-                console.log(`Searching for ${item.ingredient}...`);
-                const { products } = await searchForItem(item.ingredient);
-                console.log(`Found ${products.length} products for ${item.ingredient}`);
-
-                if (products.length === 0) {
-                    throw new Error(`No products found for ${item.ingredient}`);
-                }
-
-                // Get AI recommendation
-                console.log(`Getting recommendation for ${item.ingredient}...`);
-                const recommendation = await selectOptimalProducts(
-                    products,
-                    {
-                        quantity: quantityValue,
-                        pricePreference: 'value',
-                        preferences: item.preference ? [item.preference] : []
-                    },
-                    item.ingredient
-                );
-                console.log(`Recommendation received for ${item.ingredient}:`, recommendation);
-
-                // Add to cart using product-incremental API
-                console.log(`Adding ${item.ingredient} to cart...`);
-                
-                // Process each recommended product
-                const cartResults = [];
-                for (const rec of recommendation) {
-                    try {
-                        // Call product-incremental API for each product
-                        const prodId = parseInt(rec.product_id);
-                        const count = rec.count;
-                        
-                        console.log(`Adding product ID ${prodId} with quantity ${count} to cart...`);
-                        const addToCartResult = await getProductIncremental(prodId, item.ingredient);
-                        
-                        cartResults.push({
-                            product_id: prodId,
-                            count: count,
-                            status: 'added',
-                            result: addToCartResult
-                        });
-                    } catch (cartError) {
-                        console.error(`Error adding product to cart:`, cartError);
-                        cartResults.push({
-                            product_id: rec.product_id,
-                            count: rec.count,
-                            status: 'failed',
-                            error: cartError instanceof Error ? cartError.message : 'Unknown error'
-                        });
-                    }
-                }
-                
-                // Add result to results array
-                results.push({
-                    ingredient: item.ingredient,
-                    status: cartResults.some(r => r.status === 'failed') ? 'partial_success' : 'success',
-                    recommendation,
-                    cart_results: cartResults
-                });
-                
-            } catch (error) {
-                console.error(`Error processing ${item.ingredient}:`, error);
-                results.push({
-                    ingredient: item.ingredient,
-                    status: 'failed',
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                });
-                allSuccessful = false;
-            }
-        }
-
-        // Return overall result
-        res.json({
-            house_identifier,
-            overall_status: allSuccessful ? 'success' : 'partial_failure',
-            results
-        });
+        const result = await processCart(house_identifier, cart);
+        res.json(result);
         
     } catch (error) {
         console.error('Cart processing error:', error);
@@ -304,6 +212,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
     try {
         browser = await puppeteer.launch({ headless: true });
         await initializeBlinkit(browser);
+        // await initializeBlinkitCart(browser);
         
         app.listen(port, () => {
             console.log(`Server is running on http://localhost:${port}`);
@@ -319,5 +228,67 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
         process.exit(1);
     }
 })();
+
+// Add this new endpoint
+// app.post('/blinkit/api/add-to-cart', async (req: Request, res: Response) => {
+//     try {
+//         const { productId, productName, quantity, price, mrp } = req.body;
+        
+//         if (!productId || !productName) {
+//             return res.status(400).json({ 
+//                 error: 'Product ID and name are required' 
+//             });
+//         }
+
+//         const result = await addToBlinkitCart({
+//             productId,
+//             productName,
+//             quantity: quantity || 1,
+//             price: price || 0,
+//             mrp: mrp || 0
+//         });
+        
+//         res.json(result);
+//     } catch (error) {
+//         console.error('Blinkit add to cart error:', error);
+//         res.status(500).json({ 
+//             error: 'Internal server error', 
+//             message: error instanceof Error ? error.message : 'Unknown error'
+//         });
+//     }
+// });
+
+// Add this new endpoint
+app.get('/swiggy/api/search', async (req: Request, res: Response) => {
+    try {
+        const query = req.query.q as string;
+        
+        if (!query) {
+            return res.status(400).json({ error: 'Search query is required' });
+        }
+
+        const searchResult = await searchSwiggyInstamart(query);
+        res.json(searchResult);
+    } catch (error) {
+        console.error('Swiggy Instamart search error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/order-details', async (req, res) => {
+    try {
+        const details = await getOrderDetails();
+        res.json({
+            status: 'success',
+            data: details
+        });
+    } catch (error) {
+        console.error('Error processing order details:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error
+        });
+    }
+});
 
 export default app; 

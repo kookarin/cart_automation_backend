@@ -44,6 +44,7 @@ interface ProductResponse {
     product: Product;
     productVariant: ProductVariant;
     sellingPrice: number;
+    discountedSellingPrice: number;
     discountPercent: number;
 }
 
@@ -109,7 +110,7 @@ export async function searchProduct(query: string): Promise<SearchResult> {
             store_id: '6d49da9f-b749-4a7e-9b1b-928847d021fc',
             store_ids: '6d49da9f-b749-4a7e-9b1b-928847d021fc,1f606e33-cc6a-46ae-95d7-21bb5a401d7a',
             storeid: '6d49da9f-b749-4a7e-9b1b-928847d021fc',
-            cookie: 'accessToken=eyJhbGciOiJIUzUxMiJ9.eyJ2ZXJzaW9uIjoxLCJzdWIiOiI5ZDEyNDU4ZS0xZjEyLTRjNmEtYTJjYi03YTQyOWU0ZDU2NDIiLCJpYXQiOjE3Mzk0NDA0NTUsImV4cCI6MTczOTUyNjg1NX0.hyJPwIdXjnYW7UviFkYlBuhKc6lpqluhg0CP0K1BAqodgEjdnGgtCu0OLRxCAJ19eds4HjRxcGuYNgFh3T8R5Q; refreshToken=4ea04c68-812a-4e6a-ae11-cd186108b804; isAuth=true; _gcl_au=1.1.1727679324.1740474409; _ga=GA1.1.1570995358.1740474409; _fbp=fb.1.1740474409011.10991024835911229; _ga_37QQVCR1ZS=GS1.1.1740475370.1.1.1740476377.60.0.0; mp_dcc8757645c1c32f4481b555710c7039_mixpanel=%7B%22distinct_id%22%3A%20%22%24device%3A1953c5bdf67791-0cef9db166034f-26011a51-144000-1953c5bdf67791%22%2C%22%24device_id%22%3A%20%221953c5bdf67791-0cef9db166034f-26011a51-144000-1953c5bdf67791%22%2C%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%2C%22__mps%22%3A%20%7B%7D%2C%22__mpso%22%3A%20%7B%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%7D%2C%22__mpus%22%3A%20%7B%7D%2C%22__mpa%22%3A%20%7B%7D%2C%22__mpu%22%3A%20%7B%7D%2C%22__mpr%22%3A%20%5B%5D%2C%22__mpap%22%3A%20%5B%5D%7D; _ga_52LKG2B3L1=GS1.1.1740479261.2.1.1740479887.24.0.758258932',
+            cookie: 'accessToken=eyJhbGciOiJIUzUxMiJ9.eyJ2ZXJzaW9uIjoxLCJzdWIiOiI5ZDEyNDU4ZS0xZjEyLTRjNmEtYTJjYi03YTQyOWU0ZDU2NDIiLCJpYXQiOjE3Mzk0NDA0NTUsImV4cCI6MTczOTUyNjg1NX0.hyJPwIdXjnYW7UviFkYlBuhKc6lpqluhg0CP0K1BAqodgEjdnGgtCu0OLRxCAJ19eds4HjRxcGuYNgFh3T8R5Q; refreshToken=4ea04c68-812a-4e6a-ae11-cd186108b804; isAuth=true; _gcl_au=1.1.1727679324.1740474409; _ga=GA1.1.1570995358.1740474409; _fbp=fb.1.1740474409011.10991024835911229; _ga_37QQVCR1ZS=GS1.1.1740475370.1.1.1740476377.60.0.0; mp_dcc8757645c1c32f4481b555710c7039_mixpanel=%7B%22distinct_id%22%3A%20%22%24device%3A1953c5bdf67791-0cef9db166034f-26011a51-144000-1953c5bdf67791%22%2C%22%24device_id%22%3A%20%221953c5bdf67791-0cef9db166034f-26011a51-144000-1953c5bdf67791%22%2C%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%2C%22__mps%22%3A%20%7B%7D%2C%22__mpso%22%3A%20%7B%22%24initial_referrer%22%3A%20%22%24direct%22%2C%22%24initial_referring_domain%22%3A%20%22%24direct%22%7D%2C%22__mpus%22%3A%20%7B%7D%2C%22__mpa%22%3A%20%7B%7D%2C%22__mpu%22%3A%20%7B%7D%2C%22__mpr%22%3A%20%5B%5D%2C%22__mpap%22%3A%20%5B%5D%7D; _ga_52LKG2B3L1=GS1.1.1740565550.4.1.1740565570.40.0.988282396',
             tenant: 'ZEPTO',
             'user-agent':
                 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
@@ -172,7 +173,7 @@ export function transformProducts(products: ProductItem[], itemName: string): { 
             const product = item.productResponse.product;
             const variant = item.productResponse.productVariant;
             const mrp = variant.mrp;
-            const price = item.productResponse.sellingPrice;
+            const price = item.productResponse.discountedSellingPrice || item.productResponse.sellingPrice;
             const discount = item.productResponse.discountPercent;
             return {
                 product_id: product.id,

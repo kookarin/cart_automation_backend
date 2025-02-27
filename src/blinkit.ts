@@ -49,8 +49,9 @@ const groceryItems: string[] = [
                     headers: {
                         'Accept': 'application/json',
                         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'lat': "28.5821195",
-                        'lon': "77.3266991"
+                        'lat': "28.474679",
+                        'lon': "77.1048978",
+                        'Cookie':'gr_1_deviceId=6cb0ce9b-938e-475a-9a8f-764b0b0030c9; city=Banji; __cfruid=0d04a506ef3e9e5664bd1700e28d6772c0baa983-1740562361; _cfuvid=XFCoETpvBEaKL3aQGLwEj3H9LU6ZCMwLBe1IGc618U0-1740562361576-0.0.1.1-604800000; gr_1_lat=28.474679; gr_1_lon=77.1048978; gr_1_locality=Gurugram; gr_1_accessToken=v2%3A%3Af29a64bc-a998-42cc-8913-761d1c0ca11a; gr_1_landmark=undefined; __cf_bm=RNxMyC6NhsjJXSAT4llhqJ9lCSvn2rMtIbeD8FLiHYE-1740638342-1.0.1.1-RHTUgi5v2ylwsYCKhuiiT1N9BgAAOti6Si7zuYfq3h6J.ix51KwqZ0lSRpCOz0ilUOJsT79laMldkL20JcHeag'
                     }
                 }
             );
