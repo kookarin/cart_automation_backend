@@ -220,8 +220,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
 // Initialize browser and start server
 (async () => {
     try {
-        browser = await puppeteer.launch({ headless: true });
-        await initializeBlinkit(browser);
+
         // await initializeBlinkitCart(browser);
         
         app.listen(port, () => {
@@ -230,11 +229,10 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
 
         // Handle cleanup on server shutdown
         process.on('SIGINT', async () => {
-            await browser.close();
             process.exit();
         });
     } catch (error) {
-        console.error('Failed to initialize browser:', error);
+        console.error('Failed to initialize backend:', error);
         process.exit(1);
     }
 })();
