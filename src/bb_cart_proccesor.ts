@@ -1,9 +1,11 @@
 import { searchForItem, getProductIncremental } from './bigbasket';
 import { selectOptimalProducts } from './ai-product-selector';
+// Add type assertion if TypeScript complains about JSON import
+// import houseCookies from './config/house-cookies.json' assert { type: 'json' };
 
 interface CartItem {
     ingredient: string;
-    required_quantity: string;
+    'required quantity': string;
     preference?: string;
 }
 
@@ -13,7 +15,29 @@ interface CartProcessResult {
     results: any[];
 }
 
+interface HouseCookie {
+    cookie: string;
+    description: string;
+}
+
+interface HouseCookies {
+    [key: string]: {
+        cookie: string;
+        description: string;
+    };
+}
+
+// If you need type safety, you can type assert the import:
+const houseCookies = require('./config/house-cookies.json') as HouseCookies;
+
 export async function processCart(house_identifier: string, cart: CartItem[]): Promise<CartProcessResult> {
+    // Get cookie for this house
+    const houseConfig = houseCookies[house_identifier];
+    if (!houseConfig) {
+        throw new Error(`No configuration found for house: ${house_identifier}`);
+    }
+    const cookie = houseConfig.cookie;
+
     console.log('Processing cart for house:', house_identifier);
     console.log('Cart items:', cart);
 
@@ -28,7 +52,7 @@ export async function processCart(house_identifier: string, cart: CartItem[]): P
     // Process each cart item sequentially
     for (const item of cart) {
         try {
-            const result = await processCartItem(item);
+            const result = await processCartItem(item, cookie);
             results.push(result);
         } catch (error) {
             console.error(`Error processing ${item.ingredient}:`, error);
@@ -48,28 +72,41 @@ export async function processCart(house_identifier: string, cart: CartItem[]): P
     };
 }
 
-async function processCartItem(item: CartItem) {
+async function processCartItem(item: CartItem, cookie: string) {
     console.log(`Processing item: ${item.ingredient}`);
+    console.log(`Item: ${JSON.stringify(item)}`);
     
     // Extract quantity value and unit
-    const quantityMatch = item.required_quantity?.match(/(\d+)\s*([a-zA-Z]+)/);
-    if (!quantityMatch) {
-        throw new Error(`Invalid quantity format for ${item.ingredient}`);
+    let quantityValue: number;
+    let unit: string;
+
+    // First try to match number with unit
+    const quantityMatch = item['required quantity']?.match(/(\d+)\s*([a-zA-Z]+)/);
+    
+    if (quantityMatch) {
+        quantityValue = parseInt(quantityMatch[1]);
+        unit = quantityMatch[2];
+    } else {
+        // If no unit found, try to get just the number and assume 'piece'
+        const numberMatch = item['required quantity']?.match(/(\d+)/);
+        if (!numberMatch) {
+            throw new Error(`Invalid quantity format for ${item.ingredient}`);
+        }
+        quantityValue = parseInt(numberMatch[1]);
+        unit = 'piece';
     }
     
-    const quantityValue = parseInt(quantityMatch[1]);
-    const unit = quantityMatch[2];
     console.log(`Parsed quantity: ${quantityValue} ${unit}`);
 
-    // Search for products
+    // Pass cookie to searchForItem
     console.log(`Searching for ${item.ingredient}...`);
-    const { products } = await searchForItem(item.ingredient);
+    const { products } = await searchForItem(item.ingredient, cookie);
     console.log(`Found ${products.length} products for ${item.ingredient}`);
 
     if (products.length === 0) {
         throw new Error(`No products found for ${item.ingredient}`);
     }
-
+        
     // Get AI recommendation
     console.log(`Getting recommendation for ${item.ingredient}...`);
     const recommendation = await selectOptimalProducts(
@@ -83,8 +120,8 @@ async function processCartItem(item: CartItem) {
     );
     console.log(`Recommendation received for ${item.ingredient}:`, recommendation);
 
-    // Add to cart
-    const cartResults = await addProductsToCart(recommendation, item.ingredient);
+    // Pass cookie to addProductsToCart
+    const cartResults = await addProductsToCart(recommendation, item.ingredient, cookie);
     
     return {
         ingredient: item.ingredient,
@@ -94,39 +131,50 @@ async function processCartItem(item: CartItem) {
     };
 }
 
-async function addProductsToCart(recommendation: any[], ingredient: string) {
+async function addProductsToCart(recommendation: any[], ingredient: string, cookie: string) {
     console.log(`Adding ${ingredient} to cart...`);
     
-    // Process each recommended product
     const cartResults = [];
     for (const rec of recommendation) {
         try {
-            // Call product-incremental API for each product
             const prodId = parseInt(rec.product_id);
             const count = rec.count;
             
             console.log(`Adding product ID ${prodId} with quantity ${count} to cart...`);
             
-            // Call getProductIncremental 'count' times
             const attemptResults = [];
             for (let i = 0; i < count; i++) {
-                try {
-                    const result = await getProductIncremental(prodId, ingredient);
-                    attemptResults.push({
-                        attempt: i + 1,
-                        status: 'success',
-                        result: result
-                    });
-                } catch (error) {
-                    attemptResults.push({
-                        attempt: i + 1,
-                        status: 'failed',
-                        error: error instanceof Error ? error.message : 'Unknown error'
-                    });
+                let attempts = 0;
+                let success = false;
+                let lastError;
+                
+                // Try up to 3 times (initial try + 2 retries)
+                while (attempts < 3 && !success) {
+                    try {
+                        const result = await getProductIncremental(prodId, ingredient, cookie);
+                        attemptResults.push({
+                            attempt: attempts + 1,
+                            status: 'success',
+                            result: result
+                        });
+                        success = true;
+                    } catch (error) {
+                        lastError = error;
+                        attempts++;
+                        if (attempts < 3) {
+                            console.log(`Retry ${attempts} for product ${prodId}`);
+                            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between retries
+                        } else {
+                            attemptResults.push({
+                                attempt: attempts,
+                                status: 'failed',
+                                error: error instanceof Error ? error.message : 'Unknown error'
+                            });
+                        }
+                    }
                 }
             }
             
-            // Check if all attempts were successful
             const allSuccessful = attemptResults.every(r => r.status === 'success');
 
             cartResults.push({

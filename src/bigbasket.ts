@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { format } from 'date-fns';
 
 // Types for BigBasket API responses
 
@@ -109,7 +110,7 @@ export interface TransformedProduct {
 const options: RequestInit = {
     method: 'GET',
     headers: {
-        cookie: 'csurftoken=AHCRdQ.NTk5NDgzMjAxOTcyMjc0MTU4.1739868984906.hMhyxX9AK%2F9zV%2F0qoUcOFwWsz2sF3DOp%2BcyT%2BKzYYo0%3D',
+        // cookie: 'csurftoken=AHCRdQ.NTk5NDgzMjAxOTcyMjc0MTU4.1739868984906.hMhyxX9AK%2F9zV%2F0qoUcOFwWsz2sF3DOp%2BcyT%2BKzYYo0%3D',
         accept: '*/*',
         'accept-language': 'en-US,en;q=0.9',
         dnt: '1',
@@ -123,9 +124,31 @@ const options: RequestInit = {
         'sec-fetch-site': 'same-origin',
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
         'x-nextjs-data': '1',
-        Cookie: 'x-entry-context-id=100;x-entry-context=bb-b2c;_bb_locSrc=default;_bb_bhid=;_bb_nhid=1723;_bb_vid=NTg2MjAxMDM3NTIwNzgyMDYy;_bb_dsevid=;_bb_dsid=;csrftoken=nnroTdBnhPO04SV0akrSGKsL2opu5Sk7NlYtPJM7GU3Mk8m8ySOTn6oBDNq5wSEj;_bb_home_cache=7ce5fe69.1.visitor;bb2_enabled=true;bigbasket.com=49571bad-8998-4141-acac-4544391024ed;_bb_mid="MzEzMjEyOTY0NA==";customer_hash=f84e527d0ff68ee7871462f463d17d91;sessionid=uj90c6zde3ze07ll5y95zdlotdw94zhm;BBAUTHTOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjaGFmZiI6IjRUWUNNMXF4ZkxZMmVRIiwidGltZSI6MTc0MDM5NTQ5Ni4wNDAwMDk1LCJtaWQiOjI0MTUzNDc0LCJ2aWQiOjU4NjIwMTAzNTI5MzYwOTQ3MiwiZGV2aWNlX2lkIjoiV0VCIiwic291cmNlX2lkIjoxLCJlY19saXN0IjpbMyw0LDEwLDEyLDEzLDE0LDE1LDE2LDE3LDIwLDEwMF0sIlRETFRPS0VOIjoiNjdkZDBlZGMtYmZlOS00OGE3LWE1MzItYzE5N2M2MWZkYTUyIiwicmVmcmVzaF90b2tlbiI6ImQwYWViNTMzLTYxZmItNGUyNC04ODA3LWNmYjJmNjNkNjYwNCIsInRkbF9leHBpcnkiOjE3NDEwMDAyOTUsImV4cCI6MTc1NTE0MTkzMiwiaXNfc2FlIjpudWxsLCJkZXZpY2VfbW9kZWwiOiJXRUIiLCJkZXZpY2VfaXNfZGVidWciOiJmYWxzZSJ9.-BNdcsZZH6TqqcxF8rt7hLGSSD43kwNGfHKur6U_ofU;access_token=67dd0edc-bfe9-48a7-a532-c197c61fda52;jarvis-id=c0a46d40-07f6-4020-8803-86a1f55e490f;PWA=1;_sp_van_encom_hid=1152;_client_version=2822;_bb_hid=7427;_sp_bike_hid=1150;_bb_tc=0;_bb_rdt="MzEwNTI2ODc1MQ==.0";_bb_rd=6;ufi=1;_gcl_au=1.1.1455268102.1740400642;adb=0;_gid=GA1.2.275752233.1740400642;_fbp=fb.1.1740400642344.140082692593866543;x-channel=web;_ga_414F8KRWNG=GS1.1.1740400910.1.1.1740402138.0.0.0;_bb_bb2.0=1;is_global=0;_bb_addressinfo=;_bb_pin_code=;_is_tobacco_enabled=0;_is_bb1.0_supported=0;is_integrated_sa=1;_bb_visaddr=;_bb_cid=1;_bb_lat_long="MTIuOTc4MzQ1OXw3Ny42NDA3ODY2OTk5OTk5OQ==";_bb_aid="Mjk4MzQyODk1OA==";_bb_cda_sa_info=djIuY2RhX3NhLjEwMC4xNDkwOCwxNTEwNA==;csurftoken=81cQPg.NTg2MjAxMDM3NTIwNzgyMDYy.1740461059110.TdQ6/gTcoDfYiPtElQXr/VlbIAQyFE+riMAqieLTjgI=;_ga=GA1.2.2026374620.1740400642;_gat_UA-27455376-1=1;_bb_sa_ids=14908%2C15104;_ga_FRRYG5VKHX=GS1.1.1740459835.3.1.1740461072.18.0.0;ts=2025-02-25%2010: 54: 31.285'
+        // Cookie: 'x-entry-context-id=100; x-entry-context=bb-b2c; _bb_locSrc=default; _bb_bhid=; _bb_nhid=1723; _bb_vid=NTA4MDQ2NjgzOTE3MzcxMTE4; _bb_dsevid=; _bb_dsid=; csrftoken=Xsxr9IMbcU3uLB9qBmrdKVBrATpTXPdJHM5jJZxzD6yfUx0JqG9Pr6Bi3Xrlv6wL; _bb_home_cache=2e20737e.1.visitor; _bb_bb2.0=1; _bb_addressinfo=; _bb_pin_code=; _is_tobacco_enabled=0; _is_bb1.0_supported=0; bb2_enabled=true; jarvis-id=5fbf6931-8f29-427d-9154-ae6efe26d2a9; _bb_tc=0; _bb_rdt="MzEwNTE1NjUwMA==.0"; BBAUTHTOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjaGFmZiI6IjFpUzdCQmx4RXN6SHNRIiwidGltZSI6MTc0MDY1MzM3NC4yNTI4NDQ2LCJtaWQiOjYyMDAwNDU5LCJ2aWQiOjUwODA0NjY4NTcyNTExNjkyOCwiZGV2aWNlX2lkIjoiV0VCIiwic291cmNlX2lkIjoxLCJlY19saXN0IjpbMyw0LDEwLDEyLDEzLDE0LDE1LDE2LDE3LDIwLDEwMF0sIlRETFRPS0VOIjoiOWM4NDY3OWUtMjdkZC00OTg3LWI2MDItZWM0NGIzMDVlYjk4IiwicmVmcmVzaF90b2tlbiI6ImZkY2RkYmY5LTZjNzYtNGZlZi1hNDJjLWE2NWZjNzA1ZjMxNCIsInRkbF9leHBpcnkiOjE3NDEyNTgxNzMsImV4cCI6MTc1NjQzMzM3NCwiaXNfc2FlIjpudWxsLCJkZXZpY2VfbW9kZWwiOiJXRUIiLCJkZXZpY2VfaXNfZGVidWciOiJmYWxzZSJ9.WSLumVk_1mZ1GsdAlH3_WbEFGp4wOdbTGmbPcHO3CWc; _bb_mid="MzA5NDQ3OTI2OQ=="; customer_hash=f32d8e707e69a540340998dba032321e; sessionid=32z0oi3cl7oi9urwsmm4wud8x2eib9u3; access_token=9c84679e-27dd-4987-b602-ec44b305eb98; is_global=0; is_integrated_sa=1; _bb_visaddr=; _bb_rd=1; csurftoken=dX3rrA.NTA4MDQ2NjgzOTE3MzcxMTE4.1740722899043.Hlolgwyn5TeTC3T5QEoeBXFSBXqf+TwRAR6VnapDEes=; _bb_cda_sa_info=djIuY2RhX3NhLjEwMC4xNTAwOSwxNTExMQ==; PWA=1; x-channel=web; _bb_sa_ids=15009%2C15111; _bb_cid=18; _bb_aid="Mjg0NDY4MDM4Mg=="; ts=2025-02-28%2011:45:19.335'
     }
 };
+
+// Helper function to get daily log file path
+function getDailyLogPath(type: 'response' | 'incremental') {
+    const date = format(new Date(), 'yyyy-MM-dd');
+    const logDir = path.join(__dirname, '..', 'logs');
+    
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    return path.join(logDir, `bigbasket_${type}_${date}.txt`);
+}
+
+// Helper function to append to daily log
+function appendToLog(type: 'response' | 'incremental', content: string) {
+    const logPath = getDailyLogPath(type);
+    const timestamp = format(new Date(), 'HH:mm:ss');
+    const logEntry = `\n[${timestamp}] ${content}\n${'-'.repeat(80)}\n`;
+    
+    fs.appendFileSync(logPath, logEntry);
+}
 
 // Helper function to extract product details
 function extractProductDetails(product: BigBasketProduct): TransformedProduct {
@@ -150,31 +173,28 @@ function extractProductDetails(product: BigBasketProduct): TransformedProduct {
 }
 
 // Main search function
-export async function searchForItem(item: string): Promise<{ products: TransformedProduct[] }> {
-    const url = `https://www.bigbasket.com/_next/data/OlOtTlO5-yAkkTJCD7_c_/ps.json?q=${encodeURIComponent(item)}&nc=as&listing=ps`;
+export async function searchForItem(query: string, cookie: string): Promise<{ products: TransformedProduct[] }> {
+    const url = `https://www.bigbasket.com/_next/data/cn6n8UImd8SJt5t_wj2Jd/ps.json?q=${encodeURIComponent(query)}&nc=as&listing=ps`;
 
     try {
-        const response = await fetch(url, options);
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                Cookie: cookie
+            }
+        });
         const responseBody = await response.text();
         
-        // Write response to a file with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = path.join(__dirname, '..', 'logs', `bigbasket_response_${timestamp}.txt`);
-        
-        // Create logs directory if it doesn't exist
-        if (!fs.existsSync(path.join(__dirname, '..', 'logs'))) {
-            fs.mkdirSync(path.join(__dirname, '..', 'logs'));
-        }
-        
-        fs.writeFileSync(filename, responseBody);
-        console.log(`Response written to ${filename}`);
+        // Log the response
+        appendToLog('response', responseBody);
         
         const data = JSON.parse(responseBody) as BigBasketResponse;
 
         const productsData = data?.pageProps?.SSRData?.tabs?.[0]?.product_info?.products;
 
         if (!productsData || !Array.isArray(productsData)) {
-            console.error(`No products found for item: ${item}`);
+            console.error(`No products found for item: ${query}`);
             return { products: [] };
         }
 
@@ -194,20 +214,21 @@ export async function searchForItem(item: string): Promise<{ products: Transform
 
         return { products: allProducts };
     } catch (error) {
-        console.error(`Error processing item "${item}":`, error);
+        // Log the error
+        appendToLog('response', `Error searching for ${query}: ${error}`);
         return { products: [] };
     }
 }
 
 
-export async function getProductIncremental(prodId: number, searchTerm: string): Promise<any> {
+export async function getProductIncremental(productId: number, ingredient: string, cookie: string): Promise<any> {
     const url = 'https://www.bigbasket.com/mapi/v3.5.2/c-incr-i/';
     
     const body = JSON.stringify({
-        "prod_id": prodId,
+        "prod_id": productId,
         "_bb_client_type": "web",
         "first_atb": 0,
-        "term": searchTerm,
+        "term": ingredient,
         "term_source": "ps"
     });
 
@@ -217,7 +238,8 @@ export async function getProductIncremental(prodId: number, searchTerm: string):
         headers: {
             ...options.headers,
             'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body).toString()
+            'Content-Length': Buffer.byteLength(body).toString(),
+            Cookie: cookie
         },
         body
     };
@@ -226,20 +248,13 @@ export async function getProductIncremental(prodId: number, searchTerm: string):
         const response = await fetch(url, postOptions);
         const responseBody = await response.text();
         
-        // Log response to file (similar to searchForItem)
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = path.join(__dirname, '..', 'logs', `bigbasket_incremental_${timestamp}.txt`);
-        
-        if (!fs.existsSync(path.join(__dirname, '..', 'logs'))) {
-            fs.mkdirSync(path.join(__dirname, '..', 'logs'));
-        }
-        
-        fs.writeFileSync(filename, responseBody);
-        console.log(`Incremental response written to ${filename}`);
+        // Log the response
+        appendToLog('incremental', responseBody);
         
         return JSON.parse(responseBody);
     } catch (error) {
-        console.error(`Error getting incremental info for product ${prodId}:`, error);
+        // Log the error
+        appendToLog('incremental', `Error getting incremental info for product ${productId}: ${error}`);
         return null;
     }
 }

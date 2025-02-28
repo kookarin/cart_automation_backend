@@ -10,9 +10,8 @@ import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bb_cart_proccesor';
 // import { initializeBlinkitCart, addToBlinkitCart } from './blinkit_cart';
 import { searchSwiggyInstamart } from './swiggy_instamart';
-import { extractOrderDetails, getOrderDetails } from './order-details';
-import fs from 'fs';
-import path from 'path';
+import {  getOrderDetails } from './order-details';
+import { processCartText } from './text_cart';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -25,6 +24,14 @@ app.use(cors());
 
 // Middleware to parse JSON bodies
 app.use(express.json());
+const houseCookies = require('./config/house-cookies.json') as HouseCookies;
+
+interface HouseCookies {
+    [key: string]: {
+        cookie: string;
+        description: string;
+    };
+}
 
 let browser: Browser;
 
@@ -62,12 +69,13 @@ app.get('/zepto/api/search', async (req: Request, res: Response) => {
 app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
+        const cookie = houseCookies[1].cookie;
         
         if (!query) {
             return res.status(400).json({ error: 'Search query is required' });
         }
 
-        const searchResult = await searchForItem(query);
+        const searchResult = await searchForItem(query, cookie);
         res.json(searchResult);
     } catch (error) {
         console.error('BigBasket search error:', error);
@@ -97,6 +105,7 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
     try {
         const prodId = Number(req.query.prodId);
         const searchTerm = req.query.term as string;
+        const cookie = houseCookies[1].cookie;
         const count = Number(req.query.count) || 1; // Default to 1 if not provided
         
         if (!prodId || !searchTerm) {
@@ -110,7 +119,7 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
         
         // Make API calls based on count
         for (let i = 0; i < count; i++) {
-            const result = await getProductIncremental(prodId, searchTerm);
+            const result = await getProductIncremental(prodId, searchTerm, cookie);
             
             if (result) {
                 results.push(result);
@@ -145,8 +154,9 @@ app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
         }
 
         // First, get all available products
+        const cookie = houseCookies[1].cookie;
         console.log('Fetching products from BigBasket for:', searchTerm);
-        const { products } = await searchForItem(searchTerm);
+        const { products } = await searchForItem(searchTerm, cookie);
         console.log(`Found ${products.length} total products, ${products.filter(p => p.available).length} available`);
 
         if (products.length === 0) {
@@ -287,6 +297,31 @@ app.get('/api/order-details', async (req, res) => {
         res.status(500).json({
             status: 'error',
             message: error
+        });
+    }
+});
+
+// Add interface for the request body
+interface TextQuery {
+    cart: string;
+}
+
+// Add the new endpoint
+app.post('/text', async (req: Request<{}, {}, TextQuery>, res: Response) => {
+    try {
+        const { cart } = req.body;
+        
+        if (!cart) {
+            return res.status(400).json({ error: 'Cart text is required' });
+        }
+
+        const response = await processCartText(cart);
+        res.json({ response: response.content });
+    } catch (error) {
+        console.error('Text processing error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
         });
     }
 });

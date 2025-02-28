@@ -1,3 +1,10 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    process.env.SUPABASE_URL || '',
+    process.env.SUPABASE_ANON_KEY || ''
+);
+
 interface OrderItem {
     llc_n: string;
     weight: string;
@@ -50,7 +57,7 @@ export function extractOrderDetails(orderData: any): OrderDetails[] {
         
         return parentOrder.orders.map(order => {
             const activeState = order.states.find((state: any) => state.is_active)?.name || '';
-            console.log(order.items);
+            console.log(order);
             
             // Extract items from the nested line_items array
             const items = order.items?.flatMap((item: any) => 
@@ -110,7 +117,69 @@ async function fetchOrdersFromBigBasket(): Promise<any> {
     }
 }
 
+async function insertOrderDetails(orders: OrderDetails[]): Promise<void> {
+    for (const order of orders) {
+        // Check if order already exists
+        const { data: existingOrder, error: checkError } = await supabase
+            .from('bb_order_details')
+            .select('order_number')
+            .eq('order_number', order.order_number)
+            .single();
+
+        if (checkError && checkError.code !== 'PGRST116') {  // PGRST116 is "not found" error
+            throw checkError;
+        }
+
+        // Skip if order already exists
+        if (existingOrder) {
+            console.log(`Order ${order.order_number} already exists, skipping...`);
+            continue;
+        }
+
+        // Insert into bb_order_details
+        const { error: orderError } = await supabase
+            .from('bb_order_details')
+            .insert({
+                member: order.member,
+                order_number: order.order_number,
+                total_amount: order.total_amount,
+                wallet_used: order.wallet_used,
+                order_amount: order.order_amount,
+                active_state: order.active_state,
+                delivery_status_title: order.delivery_status_title,
+                order_id: order.order_id,
+                delivered_time: order.delivered_time
+            });
+
+        if (orderError) throw orderError;
+
+        // Insert items into bb_order_items
+        const { error: itemsError } = await supabase
+            .from('bb_order_items')
+            .insert(order.items.map(item => ({
+                order_number: order.order_number,
+                llc_n: item.llc_n,
+                weight: item.weight,
+                invoice_desc: item.invoice_desc,
+                sp: item.sp,
+                mrp: item.mrp,
+                quantity: item.quantity
+            })));
+
+        if (itemsError) throw itemsError;
+    }
+}
+
 export async function getOrderDetails(): Promise<OrderDetails[]> {
     const orderData = await fetchOrdersFromBigBasket();
-    return extractOrderDetails(orderData);
+    const orders = extractOrderDetails(orderData);
+    
+    try {
+        await insertOrderDetails(orders);
+        console.log('Data saved to Supabase successfully');
+    } catch (error) {
+        console.error('Error saving to Supabase:', error);
+    }
+    
+    return orders;
 } 
