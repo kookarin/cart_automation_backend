@@ -174,6 +174,7 @@ app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
             products, 
             {
                 quantity: Number(quantity),
+                unit: 'piece',
                 pricePreference,
                 preferences: Array.isArray(preferences) ? preferences : []
             },

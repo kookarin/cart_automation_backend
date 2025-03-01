@@ -108,13 +108,16 @@ async function processCartItem(item: CartItem, cookie: string) {
     if (products.length === 0) {
         throw new Error(`No products found for ${item.ingredient}`);
     }
-        
+    if (unit == '') {
+        unit = 'piece';
+    }
     // Get AI recommendation
     console.log(`Getting recommendation for ${item.ingredient}...`);
     const recommendation = await selectOptimalProducts(
         products,
         {
             quantity: quantityValue,
+            unit: unit,
             pricePreference: 'value',
             preferences: item.preference ? [item.preference] : []
         },

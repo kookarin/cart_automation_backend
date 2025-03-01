@@ -18,6 +18,7 @@ type ProductRecommendation = ProductRecommendationItem[];
 interface ProductSelectionCriteria {
     quantity: number;      // desired quantity in grams/kg/pieces
     pricePreference?: 'budget' | 'premium' | 'value'; // default to 'value'
+    unit: string; // unit of the quantity
     preferences?: string[]; // array of preferences (brand, pack size, organic, etc.)
 }
 
@@ -126,7 +127,7 @@ export async function selectOptimalProducts(
         products: formattedProducts,
         searchTerm: searchTerm,
         quantity: criteria.quantity,
-        unit: availableProducts[0]?.unit || 'units',
+        unit: criteria.unit || 'units',
         pricePreference: criteria.pricePreference || 'value',
         preferences: formattedPreferences
     };
