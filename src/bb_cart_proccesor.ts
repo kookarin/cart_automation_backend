@@ -1,5 +1,6 @@
 import { searchForItem, getProductIncremental } from './bigbasket';
 import { selectOptimalProducts } from './ai-product-selector';
+import { getCookieForHouse } from './services/db';
 // Add type assertion if TypeScript complains about JSON import
 // import houseCookies from './config/house-cookies.json' assert { type: 'json' };
 
@@ -31,45 +32,46 @@ interface HouseCookies {
 const houseCookies = require('./config/house-cookies.json') as HouseCookies;
 
 export async function processCart(house_identifier: string, cart: CartItem[]): Promise<CartProcessResult> {
-    // Get cookie for this house
-    const houseConfig = houseCookies[house_identifier];
-    if (!houseConfig) {
-        throw new Error(`No configuration found for house: ${house_identifier}`);
-    }
-    const cookie = houseConfig.cookie;
+    try {
+        // Get cookie from Supabase
+        const cookie = await getCookieForHouse(house_identifier);
 
-    console.log('Processing cart for house:', house_identifier);
-    console.log('Cart items:', cart);
+        console.log('Processing cart for house:', house_identifier);
+        console.log('Cart items:', cart);
 
-    if (!cart || !Array.isArray(cart) || cart.length === 0) {
-        throw new Error('Valid cart data is required');
-    }
-
-    // Results array to track processing of each item
-    const results = [];
-    let allSuccessful = true;
-
-    // Process each cart item sequentially
-    for (const item of cart) {
-        try {
-            const result = await processCartItem(item, cookie);
-            results.push(result);
-        } catch (error) {
-            console.error(`Error processing ${item.ingredient}:`, error);
-            results.push({
-                ingredient: item.ingredient,
-                status: 'failed',
-                error: error instanceof Error ? error.message : 'Unknown error'
-            });
-            allSuccessful = false;
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            throw new Error('Valid cart data is required');
         }
-    }
 
-    return {
-        house_identifier,
-        overall_status: allSuccessful ? 'success' : 'partial_failure',
-        results
-    };
+        // Results array to track processing of each item
+        const results = [];
+        let allSuccessful = true;
+
+        // Process each cart item sequentially
+        for (const item of cart) {
+            try {
+                const result = await processCartItem(item, cookie);
+                results.push(result);
+            } catch (error) {
+                console.error(`Error processing ${item.ingredient}:`, error);
+                results.push({
+                    ingredient: item.ingredient,
+                    status: 'failed',
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
+                allSuccessful = false;
+            }
+        }
+
+        return {
+            house_identifier,
+            overall_status: allSuccessful ? 'success' : 'partial_failure',
+            results
+        };
+    } catch (error) {
+        console.error('Cart processing error:', error);
+        throw error;
+    }
 }
 
 async function processCartItem(item: CartItem, cookie: string) {

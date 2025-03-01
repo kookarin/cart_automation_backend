@@ -26,6 +26,7 @@
     "@langchain/openai": "^0.4.4",
     "@supabase/supabase-js": "^2.49.1",
     "@types/puppeteer": "^5.4.7",
+    "@types/swagger-ui-express": "^4.1.8",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
@@ -33,6 +34,7 @@
     "node-fetch": "^3.3.2",
     "puppeteer": "^24.2.1",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "swagger-ui-express": "^5.0.1"
   }
 }

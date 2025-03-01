@@ -156,8 +156,8 @@ export async function searchSwiggyInstamart(query: string): Promise<{ products: 
         console.log(`Found ${products.length} products for "${query}" on Swiggy Instamart`);
         return { products };
         
-    } catch (error: any) {
-        console.error('Error searching Swiggy Instamart:', error);
-        throw new Error(error.message || 'Failed to search Swiggy Instamart');
+    } catch (error) {
+        console.error('Swiggy Instamart search error:', error);
+        throw error;
     }
 }
