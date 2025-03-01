@@ -118,7 +118,7 @@ async function processCartItem(item: CartItem, cookie: string) {
         {
             quantity: quantityValue,
             unit: unit,
-            pricePreference: 'value',
+            pricePreference: 'budget',
             preferences: item.preference ? [item.preference] : []
         },
         item.ingredient
