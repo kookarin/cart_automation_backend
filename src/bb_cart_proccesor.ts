@@ -82,19 +82,19 @@ async function processCartItem(item: CartItem, cookie: string) {
     let quantityValue: number;
     let unit: string;
 
-    // First try to match number with unit
-    const quantityMatch = item['required quantity']?.match(/(\d+)\s*([a-zA-Z]+)/);
+    // First try to match decimal or integer number with unit
+    const quantityMatch = item['required quantity']?.match(/(\d*\.?\d+)\s*([a-zA-Z]+)/);
     
     if (quantityMatch) {
-        quantityValue = parseInt(quantityMatch[1]);
+        quantityValue = parseFloat(quantityMatch[1]);
         unit = quantityMatch[2];
     } else {
-        // If no unit found, try to get just the number and assume 'piece'
-        const numberMatch = item['required quantity']?.match(/(\d+)/);
+        // If no unit found, try to get just the decimal or integer number and assume 'piece'
+        const numberMatch = item['required quantity']?.match(/(\d*\.?\d+)/);
         if (!numberMatch) {
             throw new Error(`Invalid quantity format for ${item.ingredient}`);
         }
-        quantityValue = parseInt(numberMatch[1]);
+        quantityValue = parseFloat(numberMatch[1]);
         unit = 'piece';
     }
     

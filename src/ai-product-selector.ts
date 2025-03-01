@@ -56,6 +56,9 @@ Step 2: Choose the Pack size(s)
       Keep in mind to strictly be between the specified range.
    Rule 3: If there is combination of pack sizes that can be used to fulfill the required quantity, then only consider that combination and not any other combination.
    Rule 4: Consider pack size preferences if specified.
+   Rule 5: If there is different in unit of quantity items to be searched  and wight of product then check the pack_desc to get approximate quantity.
+   For exaample if requireed mushroom is 500g and the wight in products is 1 pack then check for the pack_desc to more info.If pack_desc says (Approx. 180g - 200 g)
+   then take the average weight and hence calculate the count.
 
 Step 3: Consider price preferences
    - If 'budget' is selected, prioritize the cheapest option that meets the quantity requirements.
@@ -111,7 +114,7 @@ export async function selectOptimalProducts(
     
     // Format products for the prompt
     const formattedProducts = availableProducts.map((p, index) => 
-        `${index + 1}. ID: ${p.product_id}, Name: ${p.name}, Brand: ${p.brand}, Weight: ${p.weight}, Price: ₹${p.price}, MRP: ₹${p.mrp}, Discount: ${p.discount}%, Available: ${p.available}`
+        `${index + 1}. ID: ${p.product_id}, Name: ${p.name}, Brand: ${p.brand}, Weight: ${p.weight}, Price: ₹${p.price}, MRP: ₹${p.mrp}, Discount: ${p.discount}%, Available: ${p.available},Pack_desc: ${p.pack_desc}`
     ).join('\n');
     console.log('Products formatted for prompt');
     console.log('Products are', formattedProducts);

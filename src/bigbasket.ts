@@ -27,6 +27,7 @@ interface BigBasketProduct {
     };
     w?: string;
     unit?: string;
+    pack_desc?: string;
     images?: Array<{
         s: string;
         m: string;
@@ -92,6 +93,7 @@ interface ProductDetails {
         status: string;
         in_stock: boolean;
     };
+    pack_desc?: string;
 }
 
 export interface TransformedProduct {
@@ -104,6 +106,7 @@ export interface TransformedProduct {
     mrp: number;
     discount: number;
     available: boolean;
+    pack_desc?: string;
 }
 
 // API options
@@ -168,7 +171,8 @@ function extractProductDetails(product: BigBasketProduct): TransformedProduct {
         price: price,
         discount: Math.round(discount),
         weight: product.w || '',
-        available: isAvailable
+        available: isAvailable,
+        pack_desc: product.pack_desc || ''
     };
 }
 

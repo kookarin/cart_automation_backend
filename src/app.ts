@@ -8,10 +8,10 @@ import { initializeBlinkit, searchBlinkit } from './blinkit_products';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bb_cart_proccesor';
-// import { initializeBlinkitCart, addToBlinkitCart } from './blinkit_cart';
 import { searchSwiggyInstamart } from './swiggy_instamart';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
+import { getCookieForHouse } from './services/db';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -24,16 +24,6 @@ app.use(cors());
 
 // Middleware to parse JSON bodies
 app.use(express.json());
-const houseCookies = require('./config/house-cookies.json') as HouseCookies;
-
-
-
-interface HouseCookies {
-    [key: string]: {
-        cookie: string;
-        description: string;
-    };
-}
 
 let browser: Browser;
 
@@ -71,12 +61,14 @@ app.get('/zepto/api/search', async (req: Request, res: Response) => {
 app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
-        const cookie = houseCookies[1].cookie;
+        const houseId = req.query.houseId as string;
         
-        if (!query) {
-            return res.status(400).json({ error: 'Search query is required' });
+        if (!query || !houseId) {
+            return res.status(400).json({ error: 'Search query and house ID are required' });
         }
 
+        // Get cookie from database
+        const cookie = await getCookieForHouse(houseId);
         const searchResult = await searchForItem(query, cookie);
         res.json(searchResult);
     } catch (error) {
@@ -102,19 +94,22 @@ app.get('/blinkit/api/search', async (req: Request, res: Response) => {
     }
 });
 
-// Add this new endpoint
+// Product incremental endpoint
 app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response) => {
     try {
         const prodId = Number(req.query.prodId);
         const searchTerm = req.query.term as string;
-        const cookie = houseCookies[1].cookie;
-        const count = Number(req.query.count) || 1; // Default to 1 if not provided
+        const houseId = req.query.houseId as string;
+        const count = Number(req.query.count) || 1;
         
-        if (!prodId || !searchTerm) {
+        if (!prodId || !searchTerm || !houseId) {
             return res.status(400).json({ 
-                error: 'Product ID and search term are required' 
+                error: 'Product ID, search term, and house ID are required' 
             });
         }
+
+        // Get cookie from database
+        const cookie = await getCookieForHouse(houseId);
 
         // Array to store all results
         const results = [];
@@ -134,7 +129,6 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
             });
         }
 
-        // If count is 1, return single result, otherwise return array
         res.json(count === 1 ? results[0] : results);
     } catch (error) {
         console.error('Product incremental info error:', error);
@@ -142,21 +136,23 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
     }
 });
 
-// Add this new endpoint or update the existing one
+// Smart select endpoint
 app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
     try {
-        const { searchTerm, quantity, pricePreference, preferences } = req.body;
-        console.log('Smart Select Request:', { searchTerm, quantity, pricePreference, preferences });
+        const { searchTerm, quantity, pricePreference, preferences, houseId } = req.body;
+        console.log('Smart Select Request:', { searchTerm, quantity, pricePreference, preferences, houseId });
 
-        if (!searchTerm || !quantity) {
+        if (!searchTerm || !quantity || !houseId) {
             console.log('Missing required parameters');
             return res.status(400).json({ 
-                error: 'Search term and quantity are required' 
+                error: 'Search term, quantity, and house ID are required' 
             });
         }
 
+        // Get cookie from database
+        const cookie = await getCookieForHouse(houseId);
+
         // First, get all available products
-        const cookie = houseCookies[1].cookie;
         console.log('Fetching products from BigBasket for:', searchTerm);
         const { products } = await searchForItem(searchTerm, cookie);
         console.log(`Found ${products.length} total products, ${products.filter(p => p.available).length} available`);
@@ -240,36 +236,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
     }
 })();
 
-// Add this new endpoint
-// app.post('/blinkit/api/add-to-cart', async (req: Request, res: Response) => {
-//     try {
-//         const { productId, productName, quantity, price, mrp } = req.body;
-        
-//         if (!productId || !productName) {
-//             return res.status(400).json({ 
-//                 error: 'Product ID and name are required' 
-//             });
-//         }
 
-//         const result = await addToBlinkitCart({
-//             productId,
-//             productName,
-//             quantity: quantity || 1,
-//             price: price || 0,
-//             mrp: mrp || 0
-//         });
-        
-//         res.json(result);
-//     } catch (error) {
-//         console.error('Blinkit add to cart error:', error);
-//         res.status(500).json({ 
-//             error: 'Internal server error', 
-//             message: error instanceof Error ? error.message : 'Unknown error'
-//         });
-//     }
-// });
-
-// Add this new endpoint
 app.get('/swiggy/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
