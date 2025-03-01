@@ -12,6 +12,8 @@ import { searchSwiggyInstamart } from './swiggy_instamart';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
 import { getCookieForHouse } from './services/db';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDocument } from './config/swagger';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -26,6 +28,9 @@ app.use(cors());
 app.use(express.json());
 
 let browser: Browser;
+
+// Add swagger documentation route
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Hello World route
 app.get('/', (req: Request, res: Response) => {
@@ -274,8 +279,8 @@ interface TextQuery {
     cart: string;
 }
 
-// Add the new endpoint
-app.post('/text', async (req: Request<{}, {}, TextQuery>, res: Response) => {
+// Rename from '/text' to '/text-to-cart'
+app.post('/text-to-cart', async (req: Request<{}, {}, TextQuery>, res: Response) => {
     try {
         const { cart } = req.body;
         
