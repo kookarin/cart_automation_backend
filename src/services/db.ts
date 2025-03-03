@@ -39,7 +39,7 @@ export async function getCookieForHouse(houseId: string) {
     
     console.log('Querying for house ID:', houseId);
     const { data: checkData, error: checkError } = await supabase
-        .from('bb_automation_cookies')
+        .from('phone_house_mapping')
         .select('*')
         .eq('bigbasket_identifier', houseId);
     
