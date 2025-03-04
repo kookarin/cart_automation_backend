@@ -173,7 +173,7 @@ function extractProductDetails(product: LiciusProduct): TransformedProduct {
 
 // Main search function
 export async function searchForItemL(query: string, cookie: string): Promise<{ products: TransformedProduct[] }> {
-    const buildId = '67a0519130d1c40017b464de';
+    const buildId = '67a0519130d1c40017b464de'; //chintan
     const url = `https://www.licious.in/api/search?query=${encodeURIComponent(query)}&pageNum=0&hubId=4&kmlId=${buildId}`;
 
     try {
@@ -216,19 +216,33 @@ export async function searchForItemL(query: string, cookie: string): Promise<{ p
 
 // Function to get product incremental info
 export async function getProductIncrementalL(productId: string, ingredient: string, cookie: string): Promise<any> {
-    const url = 'https://www.licious.in/api/v2/products/incremental';
+    const url = 'https://www.licious.in/api/cart/update';
 
     try {
         const headers = {
-            ...options.headers,
-            'Content-Type': 'application/json',
-            Cookie: cookie
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9',
+            'content-type': 'application/json',
+            'origin': 'https://www.licious.in',
+            'priority': 'u=1, i',
+            'referer': 'https://www.licious.in',
+            'sec-ch-ua': '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'serverside': 'false',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            'x-csrf-token': '',
+            'Cookie': cookie
         };
 
         const body = JSON.stringify({
-            productId,
-            ingredient,
-            source: 'search'
+            product_id: productId,
+            quantity: 1,
+            lat: 12.967864,
+            lng: 77.65403
         });
 
         const response = await fetch(url, {
@@ -246,8 +260,8 @@ export async function getProductIncrementalL(productId: string, ingredient: stri
 
         return JSON.parse(responseBody);
     } catch (error) {
-        console.error('Incremental info error:', error);
-        appendToLog('incremental', `Error getting incremental info for product ${productId}: ${error}`);
+        console.error('Cart update error:', error);
+        appendToLog('incremental', `Error updating cart for product ${productId}: ${error}`);
         return null;
     }
 }

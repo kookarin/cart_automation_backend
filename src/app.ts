@@ -98,6 +98,8 @@ app.get('/licius/api/search', async (req: Request, res: Response) => {
         // Get cookie from database
         const cookie = await getCookieForHouse(houseId);
         const searchResult = await searchForItemL(query, cookie);
+
+
         res.json(searchResult);
     } catch (error) {
         console.error('Licius search error:', error);
@@ -233,6 +235,29 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
         }
 
         const result = await processCart(house_identifier, cart);
+        res.json(result);
+
+    } catch (error) {
+        console.error('Cart processing error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+
+// Update the process-cart endpoint to use product-incremental API
+app.post('/licious/api/process-cart', async (req: Request, res: Response) => {
+    try {
+        const { house_identifier, cart } = req.body;
+
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            return res.status(400).json({
+                error: 'Valid cart data is required'
+            });
+        }
+
+        const result = await processCartL(house_identifier, cart);
         res.json(result);
 
     } catch (error) {

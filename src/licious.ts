@@ -1,4 +1,4 @@
-import { searchForItem, getProductIncremental } from './liciousHelper';
+import { searchForItemL, getProductIncrementalL } from './liciousHelper';
 import { selectOptimalProducts } from './ai-product-selector';
 import { getCookieForHouse } from './services/db';
 // Add type assertion if TypeScript complains about JSON import
@@ -50,7 +50,7 @@ export async function processCartL(house_identifier: string, cart: CartItem[]): 
         // Process each cart item sequentially
         for (const item of cart) {
             try {
-                const result = await processCartItem(item, cookie);
+                const result = await processCartItemL(item, cookie);
                 results.push(result);
             } catch (error) {
                 console.error(`Error processing ${item.ingredient}:`, error);
@@ -74,7 +74,7 @@ export async function processCartL(house_identifier: string, cart: CartItem[]): 
     }
 }
 
-async function processCartItem(item: CartItem, cookie: string) {
+async function processCartItemL(item: CartItem, cookie: string) {
     console.log(`Processing item: ${item.ingredient}`);
     console.log(`Item: ${JSON.stringify(item)}`);
 
@@ -102,7 +102,7 @@ async function processCartItem(item: CartItem, cookie: string) {
 
     // Pass cookie to searchForItem
     console.log(`Searching for ${item.ingredient}...`);
-    const { products } = await searchForItem(item.ingredient, cookie);
+    const { products } = await searchForItemL(item.ingredient, cookie);
     console.log(`Found ${products.length} products for ${item.ingredient}`);
 
     if (products.length === 0) {
@@ -142,52 +142,43 @@ async function addProductsToCart(recommendation: any[], ingredient: string, cook
     const cartResults = [];
     for (const rec of recommendation) {
         try {
-            const prodId = parseInt(rec.product_id);
+            const prodId = rec.product_id;
             const count = rec.count;
 
             console.log(`Adding product ID ${prodId} with quantity ${count} to cart...`);
 
-            const attemptResults = [];
-            for (let i = 0; i < count; i++) {
-                let attempts = 0;
-                let success = false;
-                let lastError;
+            // For Licious, we can directly update the cart with the final quantity
+            let attempts = 0;
+            let success = false;
+            let lastError;
 
-                // Try up to 3 times (initial try + 2 retries)
-                while (attempts < 3 && !success) {
-                    try {
-                        const result = await getProductIncremental(prodId, ingredient, cookie);
-                        attemptResults.push({
-                            attempt: attempts + 1,
-                            status: 'success',
-                            result: result
+            // Try up to 3 times (initial try + 2 retries)
+            while (attempts < 3 && !success) {
+                try {
+                    const result = await getProductIncrementalL(prodId, ingredient, cookie);
+                    success = true;
+                    cartResults.push({
+                        product_id: prodId,
+                        count: count,
+                        status: 'added',
+                        result: result
+                    });
+                } catch (error) {
+                    lastError = error;
+                    attempts++;
+                    if (attempts < 3) {
+                        console.log(`Retry ${attempts} for product ${prodId}`);
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between retries
+                    } else {
+                        cartResults.push({
+                            product_id: prodId,
+                            count: count,
+                            status: 'failed',
+                            error: error instanceof Error ? error.message : 'Unknown error'
                         });
-                        success = true;
-                    } catch (error) {
-                        lastError = error;
-                        attempts++;
-                        if (attempts < 3) {
-                            console.log(`Retry ${attempts} for product ${prodId}`);
-                            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between retries
-                        } else {
-                            attemptResults.push({
-                                attempt: attempts,
-                                status: 'failed',
-                                error: error instanceof Error ? error.message : 'Unknown error'
-                            });
-                        }
                     }
                 }
             }
-
-            const allSuccessful = attemptResults.every(r => r.status === 'success');
-
-            cartResults.push({
-                product_id: prodId,
-                count: count,
-                status: allSuccessful ? 'added' : 'partial_add',
-                attempts: attemptResults
-            });
         } catch (error) {
             console.error(`Error adding product to cart:`, error);
             cartResults.push({
