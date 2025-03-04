@@ -1,7 +1,7 @@
 import { AzureChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
-import { SwiggyProduct } from "./swiggy_instamart";
+import { SwiggyProduct } from "./swiggyHelper";
 import dotenv from 'dotenv';
 
 dotenv.config();

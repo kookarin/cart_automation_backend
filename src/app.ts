@@ -10,13 +10,13 @@ import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bigbasket';
 import { processCartL } from './licius';
-import { searchSwiggyInstamart } from './swiggy_instamart';
+import { searchSwiggyInstamart } from './swiggyHelper';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
 import { getCookieForHouse } from './services/db';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger';
-import { processSwiggyCart } from './swiggy_cart_proccesor';
+import { processSwiggyCart } from './swiggy';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -245,24 +245,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
 });
 
 // Initialize browser and start server
-(async () => {
-    try {
 
-        // await initializeBlinkitCart(browser);
-
-        app.listen(port, () => {
-            console.log(`Server is running on http://localhost:${port}`);
-        });
-
-        // Handle cleanup on server shutdown
-        process.on('SIGINT', async () => {
-            process.exit();
-        });
-    } catch (error) {
-        console.error('Failed to initialize backend:', error);
-        process.exit(1);
-    }
-})();
 
 
 app.get('/swiggy/api/search', async (req: Request, res: Response) => {
@@ -322,4 +305,51 @@ app.post('/text-to-cart', async (req: Request<{}, {}, TextQuery>, res: Response)
     }
 });
 
+// Add Swiggy process-cart endpoint
+app.post('/swiggy/api/process-cart', async (req: Request, res: Response) => {
+    try {
+        const { cart } = req.body;
+
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            return res.status(400).json({
+                error: 'Valid cart data is required'
+            });
+        }
+
+        const result = await processSwiggyCart(cart);
+        res.json(result);
+
+    } catch (error) {
+        console.error('Swiggy cart processing error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+
+(async () => {
+    try {
+
+        // await initializeBlinkitCart(browser);
+
+        app.listen(port, () => {
+            console.log(`Server is running on http://localhost:${port}`);
+        });
+
+        // Handle cleanup on server shutdown
+        process.on('SIGINT', async () => {
+            process.exit();
+        });
+    } catch (error) {
+        console.error('Failed to initialize backend:', error);
+        process.exit(1);
+    }
+})();
+
 export default app;
+
+
+
+
+

@@ -1,6 +1,6 @@
-import { searchSwiggyInstamart } from './swiggy_instamart';
+import { searchSwiggyInstamart } from './swiggyHelper';
 import { selectOptimalProducts } from './ai-product-selector-swiggy';
-import { addToSwiggyCart } from './swiggy_instamart';
+import { addToSwiggyCart } from './swiggyHelper';
 
 interface CartItem {
     ingredient: string;
@@ -11,6 +11,8 @@ interface CartItem {
 interface CartProcessResult {
     overall_status: string;
     results: any[];
+    cart_result?: any;
+    cart_error?: string;
 }
 
 export async function processSwiggyCart(cart: CartItem[]): Promise<CartProcessResult> {
@@ -22,13 +24,15 @@ export async function processSwiggyCart(cart: CartItem[]): Promise<CartProcessRe
         }
 
         const results = [];
-        let allSuccessful = true;
+        const allCartItems = [];  // Array to collect all items to be added to cart
 
         // Process each cart item sequentially
         for (const item of cart) {
             try {
                 const result = await processSwiggyCartItem(item);
                 results.push(result);
+                // Add recommended items to our collection
+                allCartItems.push(...result.cartItems);
             } catch (error) {
                 console.error(`Error processing ${item.ingredient}:`, error);
                 results.push({
@@ -36,13 +40,27 @@ export async function processSwiggyCart(cart: CartItem[]): Promise<CartProcessRe
                     status: 'failed',
                     error: error instanceof Error ? error.message : 'Unknown error'
                 });
-                allSuccessful = false;
             }
         }
 
+        // Add all items to cart in a single call
+        let cartResult;
+        try {
+            cartResult = await addToSwiggyCart(allCartItems);
+            console.log('Added all items to cart:', cartResult);
+        } catch (error) {
+            console.error('Error adding items to cart:', error);
+            return {
+                overall_status: 'failed',
+                results,
+                cart_error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+
         return {
-            overall_status: allSuccessful ? 'success' : 'partial_failure',
-            results
+            overall_status: cartResult.statusCode === 200 ? 'success' : 'partial_failure',
+            results,
+            cart_result: cartResult
         };
     } catch (error) {
         console.error('Cart processing error:', error);
@@ -87,47 +105,19 @@ async function processSwiggyCartItem(item: CartItem) {
     );
     console.log(`Recommendation received for ${item.ingredient}:`, recommendations);
 
-    // Add products to cart
-    const cartResults = await addProductsToSwiggyCart(recommendations);
-    
+    // Transform recommendations into CartItems format
+    const cartItems = recommendations.map(rec => ({
+        itemId: rec.itemId,
+        productId: rec.productId,
+        quantity: rec.count,
+        spin: rec.spin,
+        storeId: rec.storeId
+    }));
+
     return {
         ingredient: item.ingredient,
-        status: cartResults.some(r => r.status === 'failed') ? 'partial_success' : 'success',
+        status: 'processed',
         recommendations,
-        cart_results: cartResults
+        cartItems  // Return the cart items instead of making API call
     };
-}
-
-async function addProductsToSwiggyCart(recommendations: any[]) {
-    console.log(`Adding products to Swiggy cart...`);
-    
-    const cartResults = [];
-    for (const rec of recommendations) {
-        try {
-            const result = await addToSwiggyCart(
-                rec.itemId,
-                rec.productId,
-                rec.count,
-                rec.spin,
-                rec.storeId
-            );
-            
-            cartResults.push({
-                itemId: rec.itemId,
-                count: rec.count,
-                status: 'success',
-                result: result
-            });
-        } catch (error) {
-            console.error(`Error adding product to cart:`, error);
-            cartResults.push({
-                itemId: rec.itemId,
-                count: rec.count,
-                status: 'failed',
-                error: error instanceof Error ? error.message : 'Unknown error'
-            });
-        }
-    }
-    
-    return cartResults;
 }

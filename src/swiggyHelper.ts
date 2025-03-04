@@ -199,28 +199,30 @@ interface SwiggyCartRequest {
     source: string;
 }
 
-export async function addToSwiggyCart(
-    itemId: string,
-    productId: string,
-    quantity: number,
-    spin: string,
-    storeId: number
-): Promise<any> {
+interface CartItem {
+    itemId: string;
+    productId: string;
+    quantity: number;
+    spin: string;
+    storeId: number;
+}
+
+export async function addToSwiggyCart(items: CartItem[]): Promise<any> {
     const url = 'https://www.swiggy.com/api/instamart/checkout/v2/cart?pageType=INSTAMART_SEARCH';
     
     const cartRequest: SwiggyCartRequest = {
         data: {
-            items: [{
-                quantity,
-                itemId,
-                productId,
-                spin,
+            items: items.map(item => ({
+                quantity: item.quantity,
+                itemId: item.itemId,
+                productId: item.productId,
+                spin: item.spin,
                 meta: {
                     type: "structure",
-                    storeId
+                    storeId: item.storeId
                 },
                 serviceLine: "INSTAMART"
-            }],
+            })),
             cartMetaData: {
                 contactlessDelivery: false,
                 deliveryType: "INSTANT",
