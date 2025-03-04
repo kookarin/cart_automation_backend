@@ -1,4 +1,4 @@
-import { searchForItem, getProductIncremental } from './bigbasketHelper';
+import { searchForItem, getProductIncremental } from './liciousHelper';
 import { selectOptimalProducts } from './ai-product-selector';
 import { getCookieForHouse } from './services/db';
 // Add type assertion if TypeScript complains about JSON import

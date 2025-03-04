@@ -4,7 +4,7 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { searchProduct, getFirstFiveProducts, transformProducts } from './zepto_products';
 import { searchForItem, getProductIncremental } from './bigbasketHelper';
-import { searchForItemL, getProductIncrementalL } from './liciusHelper';
+import { searchForItemL, getProductIncrementalL } from './liciousHelper';
 import { initializeBlinkit, searchBlinkit } from './blinkit_products';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
@@ -97,7 +97,7 @@ app.get('/licius/api/search', async (req: Request, res: Response) => {
 
         // Get cookie from database
         const cookie = await getCookieForHouse(houseId);
-        const searchResult = await searchForItem(query, cookie);
+        const searchResult = await searchForItemL(query, cookie);
         res.json(searchResult);
     } catch (error) {
         console.error('Licius search error:', error);
