@@ -3,11 +3,11 @@ import cors from 'cors';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { searchProduct, getFirstFiveProducts, transformProducts } from './zepto_products';
-import { searchForItem, getProductIncremental } from './bigbasket';
+import { searchForItem, getProductIncremental } from './bigbasketHelper';
 import { initializeBlinkit, searchBlinkit } from './blinkit_products';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
-import { processCart } from './bb_cart_proccesor';
+import { processCart } from './bigbasket';
 import { searchSwiggyInstamart } from './swiggy_instamart';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
@@ -46,7 +46,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.get('/zepto/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
-        
+
         if (!query) {
             return res.status(400).json({ error: 'Search query is required' });
         }
@@ -67,7 +67,7 @@ app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
         const houseId = req.query.houseId as string;
-        
+
         if (!query || !houseId) {
             return res.status(400).json({ error: 'Search query and house ID are required' });
         }
@@ -86,7 +86,7 @@ app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
 app.get('/blinkit/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
-        
+
         if (!query) {
             return res.status(400).json({ error: 'Search query is required' });
         }
@@ -106,10 +106,10 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
         const searchTerm = req.query.term as string;
         const houseId = req.query.houseId as string;
         const count = Number(req.query.count) || 1;
-        
+
         if (!prodId || !searchTerm || !houseId) {
-            return res.status(400).json({ 
-                error: 'Product ID, search term, and house ID are required' 
+            return res.status(400).json({
+                error: 'Product ID, search term, and house ID are required'
             });
         }
 
@@ -118,19 +118,19 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
 
         // Array to store all results
         const results = [];
-        
+
         // Make API calls based on count
         for (let i = 0; i < count; i++) {
             const result = await getProductIncremental(prodId, searchTerm, cookie);
-            
+
             if (result) {
                 results.push(result);
             }
         }
-        
+
         if (results.length === 0) {
-            return res.status(404).json({ 
-                error: 'Product information not found' 
+            return res.status(404).json({
+                error: 'Product information not found'
             });
         }
 
@@ -149,8 +149,8 @@ app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
 
         if (!searchTerm || !quantity || !houseId) {
             console.log('Missing required parameters');
-            return res.status(400).json({ 
-                error: 'Search term, quantity, and house ID are required' 
+            return res.status(400).json({
+                error: 'Search term, quantity, and house ID are required'
             });
         }
 
@@ -164,15 +164,15 @@ app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
 
         if (products.length === 0) {
             console.log('No products found in search results');
-            return res.status(404).json({ 
-                error: 'No products found' 
+            return res.status(404).json({
+                error: 'No products found'
             });
         }
 
         // Use AI to select optimal products
         console.log('Requesting AI recommendation...');
         const recommendation = await selectOptimalProducts(
-            products, 
+            products,
             {
                 quantity: Number(quantity),
                 unit: 'piece',
@@ -191,8 +191,8 @@ app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('Smart selection error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error', 
+        res.status(500).json({
+            error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
     }
@@ -202,20 +202,20 @@ app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
 app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
     try {
         const { house_identifier, cart } = req.body;
-        
+
         if (!cart || !Array.isArray(cart) || cart.length === 0) {
-            return res.status(400).json({ 
-                error: 'Valid cart data is required' 
+            return res.status(400).json({
+                error: 'Valid cart data is required'
             });
         }
 
         const result = await processCart(house_identifier, cart);
         res.json(result);
-        
+
     } catch (error) {
         console.error('Cart processing error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error', 
+        res.status(500).json({
+            error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
     }
@@ -226,7 +226,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
     try {
 
         // await initializeBlinkitCart(browser);
-        
+
         app.listen(port, () => {
             console.log(`Server is running on http://localhost:${port}`);
         });
@@ -245,7 +245,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
 app.get('/swiggy/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
-        
+
         if (!query) {
             return res.status(400).json({ error: 'Search query is required' });
         }
@@ -283,7 +283,7 @@ interface TextQuery {
 app.post('/text-to-cart', async (req: Request<{}, {}, TextQuery>, res: Response) => {
     try {
         const { cart } = req.body;
-        
+
         if (!cart) {
             return res.status(400).json({ error: 'Cart text is required' });
         }
@@ -292,11 +292,11 @@ app.post('/text-to-cart', async (req: Request<{}, {}, TextQuery>, res: Response)
         res.json({ response: response.content });
     } catch (error) {
         console.error('Text processing error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
     }
 });
 
-export default app; 
+export default app;
