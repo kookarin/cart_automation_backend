@@ -8,12 +8,13 @@ import { initializeBlinkit, searchBlinkit } from './blinkit_products';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bb_cart_proccesor';
-import { searchSwiggyInstamart } from './swiggy_instamart';
+import { searchSwiggyInstamart,addToSwiggyCart } from './swiggy_instamart';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
 import { getCookieForHouse } from './services/db';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger';
+import { processSwiggyCart } from './swiggy_cart_proccesor';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -294,6 +295,64 @@ app.post('/text-to-cart', async (req: Request<{}, {}, TextQuery>, res: Response)
         console.error('Text processing error:', error);
         res.status(500).json({ 
             error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+
+// Add to cart endpoint
+app.post('/api/swiggy/add-to-cart', async (req, res) => {
+    try {
+        const { itemId, productId, quantity, spin, storeId } = req.body;
+
+        // Validate required fields
+        if (!itemId || !productId || !quantity || !spin || !storeId) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Missing required fields: itemId, productId, quantity, spin, storeId'
+            });
+        }
+
+        const result = await addToSwiggyCart(
+            itemId,
+            productId,
+            quantity,
+            spin,
+            storeId
+        );
+
+        res.json({
+            status: 'success',
+            data: result
+        });
+
+    } catch (error) {
+        console.error('Error adding to Swiggy cart:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error occurred'
+        });
+    }
+});
+
+// Process Swiggy cart endpoint
+app.post('/swiggy/api/process-cart', async (req: Request, res: Response) => {
+    try {
+        const { cart } = req.body;
+        
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            return res.status(400).json({ 
+                error: 'Valid cart data is required' 
+            });
+        }
+
+        const result = await processSwiggyCart(cart);
+        res.json(result);
+        
+    } catch (error) {
+        console.error('Swiggy cart processing error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error', 
             message: error instanceof Error ? error.message : 'Unknown error'
         });
     }
