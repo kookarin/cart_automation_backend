@@ -68,8 +68,7 @@ export async function processSwiggyCart(cart: CartItem[], houseId: string): Prom
 
         return {
             overall_status: cartResult.statusCode === 200 ? 'success' : 'partial_failure',
-            results,
-            cart_result: cartResult
+            results
         };
     } catch (error) {
         console.error('Cart processing error:', error);

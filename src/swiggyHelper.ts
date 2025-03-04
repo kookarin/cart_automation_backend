@@ -1,6 +1,4 @@
 import { Browser, Page } from 'puppeteer';
-import fs from 'fs';
-import path from 'path';
 
 let page: Page;
 
@@ -84,23 +82,7 @@ export async function searchSwiggyInstamart(query: string, cookie: string): Prom
         };
         
         const response = await fetch(url, options);
-        const responseText = await response.text();
-        
-        // Log the response
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const logDir = path.join(__dirname, '..', 'logs');
-        
-        // Create logs directory if it doesn't exist
-        if (!fs.existsSync(logDir)) {
-            fs.mkdirSync(logDir);
-        }
-        
-        const logFile = path.join(logDir, `swiggy_search_${timestamp}.json`);
-        fs.writeFileSync(logFile, responseText);
-        console.log(`Swiggy search response for "${query}" written to ${logFile}`);
-        
-        // Parse the response
-        const responseData = JSON.parse(responseText);
+        const responseData = await response.json();
         
         // Extract products from the response
         const products: SwiggyProduct[] = [];
@@ -116,7 +98,7 @@ export async function searchSwiggyInstamart(query: string, cookie: string): Prom
                 productWidget.data.forEach((item: any) => {
                     if (item.variations && item.variations.length > 0) {
                         // Iterate through all variations
-                        item.variations.forEach((variation: any, index: number) => {
+                        item.variations.forEach((variation: any) => {
                             const price = variation.price || {};
                             const inventory = variation.inventory || {};
                             const meta = variation.meta || {};
