@@ -4,10 +4,12 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { searchProduct, getFirstFiveProducts, transformProducts } from './zepto_products';
 import { searchForItem, getProductIncremental } from './bigbasketHelper';
+import { searchForItemL, getProductIncrementalL } from './liciusHelper';
 import { initializeBlinkit, searchBlinkit } from './blinkit_products';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bigbasket';
+import { processCartL } from './licius';
 import { searchSwiggyInstamart } from './swiggy_instamart';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
@@ -79,6 +81,26 @@ app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
         res.json(searchResult);
     } catch (error) {
         console.error('BigBasket search error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Licius search endpoint
+app.get('/licius/api/search', async (req: Request, res: Response) => {
+    try {
+        const query = req.query.q as string;
+        const houseId = req.query.houseId as string;
+
+        if (!query || !houseId) {
+            return res.status(400).json({ error: 'Search query and house ID are required' });
+        }
+
+        // Get cookie from database
+        const cookie = await getCookieForHouse(houseId);
+        const searchResult = await searchForItem(query, cookie);
+        res.json(searchResult);
+    } catch (error) {
+        console.error('Licius search error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
