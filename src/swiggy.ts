@@ -1,6 +1,6 @@
 import { searchSwiggyInstamart, addToSwiggyCart } from './swiggyHelper';
 import { selectOptimalProducts } from './ai-product-selector-swiggy';
-import { getCookieForHouseSwiggy } from './services/db';
+import { getCookieForHouse } from './services/db';
 
 interface CartItem {
     ingredient: string;
@@ -28,7 +28,7 @@ export async function processSwiggyCart(cart: CartItem[], houseId: string): Prom
         }
 
         // Get cookie from database instead of JSON file
-        const cookie = await getCookieForHouseSwiggy(houseId);
+        const cookie = await getCookieForHouse(houseId,'Swiggy');
         console.log('Cookie retrieved for house:', houseId);
         
         const results = [];
@@ -57,6 +57,7 @@ export async function processSwiggyCart(cart: CartItem[], houseId: string): Prom
         try {
             cartResult = await addToSwiggyCart(allCartItems, cookie);
             console.log('Added all items to cart:', cartResult);
+            console.log('Added all items to cart:', cartResult.statusCode);
         } catch (error) {
             console.error('Error adding items to cart:', error);
             return {
@@ -67,7 +68,7 @@ export async function processSwiggyCart(cart: CartItem[], houseId: string): Prom
         }
 
         return {
-            overall_status: cartResult.statusCode === 200 ? 'success' : 'partial_failure',
+            overall_status: cartResult.datastatusCode === 200 ||137 ? 'success' : 'partial_failure',
             results
         };
     } catch (error) {
