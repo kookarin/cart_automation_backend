@@ -1,7 +1,7 @@
 import { AzureChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
-import { TransformedProduct } from "./bigbasket";
+import { TransformedProduct } from "./bigbasketHelper";
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -23,7 +23,7 @@ interface ProductSelectionCriteria {
 }
 
 const PROMPT_TEMPLATE = `
-You are a smart shopping assistant. Given a list of available products and customer requirements, 
+You are a smart shopping assistant. Given a list of available products and customer requirements,
 recommend the best combination of products to purchase.
 
 ### Available Products:
@@ -73,12 +73,12 @@ function extractJsonFromString(text: string): string {
     // Look for JSON pattern - starts with { or [ and ends with } or ]
     const jsonRegex = /(\[.*\]|\{.*\})/s;  // 's' flag for multiline matching
     const match = text.match(jsonRegex);
-    
+
     if (match && match[0]) {
         console.log('Extracted JSON from response');
         return match[0];
     }
-    
+
     console.log('No JSON pattern found in response');
     return text; // Return original if no JSON pattern found
 }
@@ -94,7 +94,7 @@ export async function selectOptimalProducts(
     // Filter out unavailable products
     const availableProducts = products.filter(p => p.available);
     console.log(`Filtered ${products.length} products to ${availableProducts.length} available products`);
-    
+
     if (availableProducts.length === 0) {
         console.log('No available products found');
         throw new Error("No available products found");
@@ -111,9 +111,9 @@ export async function selectOptimalProducts(
     console.log('LLM initialized');
 
     const prompt = PromptTemplate.fromTemplate(PROMPT_TEMPLATE);
-    
+
     // Format products for the prompt
-    const formattedProducts = availableProducts.map((p, index) => 
+    const formattedProducts = availableProducts.map((p, index) =>
         `${index + 1}. ID: ${p.product_id}, Name: ${p.name}, Brand: ${p.brand}, Weight: ${p.weight}, Price: ₹${p.price}, MRP: ₹${p.mrp}, Discount: ${p.discount}%, Available: ${p.available},Pack_desc: ${p.pack_desc}`
     ).join('\n');
     console.log('Products formatted for prompt');
@@ -121,7 +121,7 @@ export async function selectOptimalProducts(
     console.log('Formatted products sample:', formattedProducts.slice(0, 10)); // Show first 2 products
 
     // Format preferences for the prompt
-    const formattedPreferences = criteria.preferences && criteria.preferences.length > 0 
+    const formattedPreferences = criteria.preferences && criteria.preferences.length > 0
         ? criteria.preferences.join(", ")
         : "None";
     console.log('Preferences formatted:', formattedPreferences);
@@ -137,11 +137,11 @@ export async function selectOptimalProducts(
     console.log('Full prompt input:', promptInput);
 
     console.log('Sending request to LLM...');
-    
+
     // Create the formatted prompt first
     const formattedPrompt = await prompt.format(promptInput);
     console.log('Formatted prompt:', formattedPrompt);
-    
+
     // Then send it to the LLM
     const responseObj = await llm.invoke(formattedPrompt);
     const response = responseObj.content.toString();
@@ -151,7 +151,7 @@ export async function selectOptimalProducts(
         // Extract JSON from the response string
         const jsonString = extractJsonFromString(response);
         console.log('Extracted JSON string:', jsonString);
-        
+
         // Parse the extracted JSON
         let parsedResponse;
         const jsonData = JSON.parse(jsonString);
@@ -163,4 +163,4 @@ export async function selectOptimalProducts(
         console.error('Raw response that failed to parse:', response);
         throw new Error('Failed to get product recommendations');
     }
-} 
+}

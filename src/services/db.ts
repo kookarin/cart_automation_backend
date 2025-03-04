@@ -18,7 +18,7 @@ export async function getAllCookies() {
     console.log('Using anon key:', process.env.SUPABASE_ANON_KEY?.substring(0, 10) + '...');
 
     const { data, error } = await supabase
-        .from('bb_automation_cookies')
+        .from('phone_house_mapping')
         .select('*');
     
     console.log('All rows in database:', data);
@@ -39,7 +39,7 @@ export async function getCookieForHouse(houseId: string) {
     
     console.log('Querying for house ID:', houseId);
     const { data: checkData, error: checkError } = await supabase
-        .from('bb_automation_cookies')
+        .from('phone_house_mapping')
         .select('*')
         .eq('bigbasket_identifier', houseId);
     
