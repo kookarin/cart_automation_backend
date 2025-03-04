@@ -96,7 +96,7 @@ app.get('/licius/api/search', async (req: Request, res: Response) => {
 
         // Get cookie from database
         const cookie = await getCookieForHouse(houseId);
-        const searchResult = await searchForItem(query, cookie);
+        const searchResult = await searchForItemL(query, cookie);
         res.json(searchResult);
     } catch (error) {
         console.error('Licius search error:', error);
