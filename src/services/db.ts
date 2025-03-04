@@ -64,3 +64,25 @@ export async function getCookieForHouse(houseId: string) {
 
     return latestCookie.cookies;
 }
+
+export async function getCookieForHouseSwiggy(houseId: string) {
+    const { data, error } = await supabase
+        .from('phone_house_mapping')
+        .select('*')
+        .eq('house_id', houseId)
+        .eq('platform', 'Swiggy')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (error) {
+        console.error('Error fetching cookie:', error);
+        throw new Error(`Failed to fetch cookie: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+        throw new Error(`No active cookie found for house: ${houseId} on Swiggy platform`);
+    }
+
+    return data[0].cookies;
+}

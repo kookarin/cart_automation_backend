@@ -1,6 +1,6 @@
-import { searchSwiggyInstamart } from './swiggyHelper';
+import { searchSwiggyInstamart, addToSwiggyCart } from './swiggyHelper';
 import { selectOptimalProducts } from './ai-product-selector-swiggy';
-import { addToSwiggyCart } from './swiggyHelper';
+import { getCookieForHouseSwiggy } from './services/db';
 
 interface CartItem {
     ingredient: string;
@@ -15,7 +15,7 @@ interface CartProcessResult {
     cart_error?: string;
 }
 
-export async function processSwiggyCart(cart: CartItem[]): Promise<CartProcessResult> {
+export async function processSwiggyCart(cart: CartItem[], houseId: string): Promise<CartProcessResult> {
     try {
         console.log('Processing Swiggy cart items:', cart);
 
@@ -23,13 +23,22 @@ export async function processSwiggyCart(cart: CartItem[]): Promise<CartProcessRe
             throw new Error('Valid cart data is required');
         }
 
+        if (!houseId) {
+            throw new Error('House ID is required');
+        }
+
+        // Get cookie from database instead of JSON file
+        const cookie = await getCookieForHouseSwiggy(houseId);
+        console.log('Cookie retrieved for house:', houseId);
+        
         const results = [];
         const allCartItems = [];  // Array to collect all items to be added to cart
 
         // Process each cart item sequentially
         for (const item of cart) {
             try {
-                const result = await processSwiggyCartItem(item);
+                const { products } = await searchSwiggyInstamart(item.ingredient, cookie);
+                const result = await processSwiggyCartItem(item, products);
                 results.push(result);
                 // Add recommended items to our collection
                 allCartItems.push(...result.cartItems);
@@ -46,7 +55,7 @@ export async function processSwiggyCart(cart: CartItem[]): Promise<CartProcessRe
         // Add all items to cart in a single call
         let cartResult;
         try {
-            cartResult = await addToSwiggyCart(allCartItems);
+            cartResult = await addToSwiggyCart(allCartItems, cookie);
             console.log('Added all items to cart:', cartResult);
         } catch (error) {
             console.error('Error adding items to cart:', error);
@@ -68,7 +77,7 @@ export async function processSwiggyCart(cart: CartItem[]): Promise<CartProcessRe
     }
 }
 
-async function processSwiggyCartItem(item: CartItem) {
+async function processSwiggyCartItem(item: CartItem, products: any[]): Promise<any> {
     console.log(`Processing item: ${item.ingredient}`);
     console.log(`Item: ${JSON.stringify(item)}`);
     
@@ -84,7 +93,6 @@ async function processSwiggyCartItem(item: CartItem) {
 
     // Search for products
     console.log(`Searching for ${item.ingredient}...`);
-    const { products } = await searchSwiggyInstamart(item.ingredient);
     console.log(`Found ${products.length} products for ${item.ingredient}`);
 
     if (products.length === 0) {

@@ -9,7 +9,7 @@ import { initializeBlinkit, searchBlinkit } from './blinkit_products';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bigbasket';
-import { processCartL } from './licius';
+import { processCartL } from './licious';
 import { searchSwiggyInstamart } from './swiggyHelper';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
@@ -251,12 +251,14 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
 app.get('/swiggy/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
+        const houseId = req.query.houseId as string;
 
-        if (!query) {
-            return res.status(400).json({ error: 'Search query is required' });
+        if (!query || !houseId) {
+            return res.status(400).json({ error: 'Search query and house ID are required' });
         }
 
-        const searchResult = await searchSwiggyInstamart(query);
+
+        const searchResult = await searchSwiggyInstamart(query,houseId);
         res.json(searchResult);
     } catch (error) {
         console.error('Swiggy Instamart search error:', error);
@@ -308,7 +310,7 @@ app.post('/text-to-cart', async (req: Request<{}, {}, TextQuery>, res: Response)
 // Add Swiggy process-cart endpoint
 app.post('/swiggy/api/process-cart', async (req: Request, res: Response) => {
     try {
-        const { cart } = req.body;
+        const { cart, houseId } = req.body;
 
         if (!cart || !Array.isArray(cart) || cart.length === 0) {
             return res.status(400).json({
@@ -316,7 +318,13 @@ app.post('/swiggy/api/process-cart', async (req: Request, res: Response) => {
             });
         }
 
-        const result = await processSwiggyCart(cart);
+        if (!houseId) {
+            return res.status(400).json({
+                error: 'House ID is required'
+            });
+        }
+
+        const result = await processSwiggyCart(cart, houseId);
         res.json(result);
 
     } catch (error) {
