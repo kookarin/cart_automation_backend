@@ -34,7 +34,7 @@ const houseCookies = require('./config/house-cookies.json') as HouseCookies;
 export async function processCart(house_identifier: string, cart: CartItem[]): Promise<CartProcessResult> {
     try {
         // Get cookie from Supabase
-        const cookie = await getCookieForHouse(house_identifier);
+        const cookie = await getCookieForHouse(house_identifier,'Bigbasket');
 
         console.log('Processing cart for house:', house_identifier);
         console.log('Cart items:', cart);

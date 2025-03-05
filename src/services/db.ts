@@ -31,7 +31,7 @@ export async function getAllCookies() {
     return data;
 }
 
-export async function getCookieForHouse(houseId: string) {
+export async function getCookieForHouseOld(houseId: string) {
     // First get all cookies to see what's available
     console.log('Getting all cookies first...');
     const allCookies = await getAllCookies();
@@ -63,4 +63,30 @@ export async function getCookieForHouse(houseId: string) {
     });
 
     return latestCookie.cookies;
+}
+
+export async function getCookieForHouse(houseId: string, platform: string) {
+    const { data, error } = await supabase
+        .from('phone_house_mapping')
+        .select('*')
+        .eq('house_id', houseId)
+        .eq('platform', platform)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (error) {
+        console.error('Error fetching cookie:', error);
+        throw new Error(`Failed to fetch cookie: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+        throw new Error(`No active cookie found for house: ${houseId} on ${platform} platform`);
+    }
+    if(platform === 'Licious'){
+        return [data[0].cookies,data[0].build_id];
+    }
+    else{
+        return data[0].cookies;
+    }
 }

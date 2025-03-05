@@ -10,12 +10,13 @@ import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bigbasket';
 import { processCartL } from './licious';
-import { searchSwiggyInstamart } from './swiggy_instamart';
+import { searchSwiggyInstamart } from './swiggyHelper';
 import {  getOrderDetails } from './order-details';
 import { processCartText } from './text_cart';
 import { getCookieForHouse } from './services/db';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger';
+import { processSwiggyCart } from './swiggy';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -58,9 +59,11 @@ app.get('/zepto/api/search', async (req: Request, res: Response) => {
         const transformedProducts = transformProducts(topFiveProducts, query);
 
         res.json(transformedProducts);
+        console.log('Request completed: /zepto/api/search ================================');
     } catch (error) {
         console.error('Search error:', error);
         res.status(500).json({ error: 'Internal server error' });
+        console.log('Request failed: /zepto/api/search ================================');
     }
 });
 
@@ -75,12 +78,14 @@ app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
         }
 
         // Get cookie from database
-        const cookie = await getCookieForHouse(houseId);
+        const cookie = await getCookieForHouse(houseId,'Bigbasket');
         const searchResult = await searchForItem(query, cookie);
         res.json(searchResult);
+        console.log('Request completed: /bigbasket/api/search ================================');
     } catch (error) {
         console.error('BigBasket search error:', error);
         res.status(500).json({ error: 'Internal server error' });
+        console.log('Request failed: /bigbasket/api/search ================================');
     }
 });
 
@@ -95,14 +100,18 @@ app.get('/licius/api/search', async (req: Request, res: Response) => {
         }
 
         // Get cookie from database
-        const cookie = await getCookieForHouse(houseId);
-        const searchResult = await searchForItemL(query, cookie);
+        const db_resp = await getCookieForHouse(houseId,'Licious');
+        const cookie = db_resp[0];
+        const buildId = db_resp[1];
+        const searchResult = await searchForItemL(query, cookie, buildId);
 
 
         res.json(searchResult);
+        console.log('Request completed: /licious/api/search ================================');
     } catch (error) {
         console.error('Licius search error:', error);
         res.status(500).json({ error: 'Internal server error' });
+        console.log('Request failed: /licious/api/search ================================');
     }
 });
 
@@ -117,9 +126,11 @@ app.get('/blinkit/api/search', async (req: Request, res: Response) => {
 
         const searchResult = await searchBlinkit(query);
         res.json(searchResult);
+        console.log('Request completed: /blinkit/api/search ================================');
     } catch (error) {
         console.error('Blinkit search error:', error);
         res.status(500).json({ error: 'Internal server error' });
+        console.log('Request failed: /blinkit/api/search ================================');
     }
 });
 
@@ -138,7 +149,7 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
         }
 
         // Get cookie from database
-        const cookie = await getCookieForHouse(houseId);
+        const cookie = await getCookieForHouse(houseId,'Bigbasket');
 
         // Array to store all results
         const results = [];
@@ -159,68 +170,16 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
         }
 
         res.json(count === 1 ? results[0] : results);
+        console.log('Request completed: /bigbasket/api/product-incremental ================================');
     } catch (error) {
         console.error('Product incremental info error:', error);
         res.status(500).json({ error: 'Internal server error' });
+        console.log('Request failed: /bigbasket/api/product-incremental ================================');
     }
 });
 
 // Smart select endpoint
-app.post('/bigbasket/api/smart-select', async (req: Request, res: Response) => {
-    try {
-        const { searchTerm, quantity, pricePreference, preferences, houseId } = req.body;
-        console.log('Smart Select Request:', { searchTerm, quantity, pricePreference, preferences, houseId });
 
-        if (!searchTerm || !quantity || !houseId) {
-            console.log('Missing required parameters');
-            return res.status(400).json({
-                error: 'Search term, quantity, and house ID are required'
-            });
-        }
-
-        // Get cookie from database
-        const cookie = await getCookieForHouse(houseId);
-
-        // First, get all available products
-        console.log('Fetching products from BigBasket for:', searchTerm);
-        const { products } = await searchForItem(searchTerm, cookie);
-        console.log(`Found ${products.length} total products, ${products.filter(p => p.available).length} available`);
-
-        if (products.length === 0) {
-            console.log('No products found in search results');
-            return res.status(404).json({
-                error: 'No products found'
-            });
-        }
-
-        // Use AI to select optimal products
-        console.log('Requesting AI recommendation...');
-        const recommendation = await selectOptimalProducts(
-            products,
-            {
-                quantity: Number(quantity),
-                unit: 'piece',
-                pricePreference,
-                preferences: Array.isArray(preferences) ? preferences : []
-            },
-            searchTerm
-        );
-        console.log('AI Recommendation received:', recommendation);
-
-        res.json({
-            searchTerm,
-            recommendation,
-            availableProducts: products.filter(p => p.available).length,
-            totalProducts: products.length
-        });
-    } catch (error) {
-        console.error('Smart selection error:', error);
-        res.status(500).json({
-            error: 'Internal server error',
-            message: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-});
 
 // Update the process-cart endpoint to use product-incremental API
 app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
@@ -235,6 +194,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
 
         const result = await processCart(house_identifier, cart);
         res.json(result);
+        console.log('Request completed: /bigbasket/api/process-cart ================================');
 
     } catch (error) {
         console.error('Cart processing error:', error);
@@ -242,6 +202,7 @@ app.post('/bigbasket/api/process-cart', async (req: Request, res: Response) => {
             error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
+        console.log('Request failed: /bigbasket/api/process-cart ================================');
     }
 });
 
@@ -258,6 +219,7 @@ app.post('/licious/api/process-cart', async (req: Request, res: Response) => {
 
         const result = await processCartL(house_identifier, cart);
         res.json(result);
+        console.log('Request completed: /licious/api/process-cart ================================');
 
     } catch (error) {
         console.error('Cart processing error:', error);
@@ -265,43 +227,31 @@ app.post('/licious/api/process-cart', async (req: Request, res: Response) => {
             error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
+        console.log('Request failed: /licious/api/process-cart ================================');
     }
 });
 
 // Initialize browser and start server
-(async () => {
-    try {
 
-        // await initializeBlinkitCart(browser);
-
-        app.listen(port, () => {
-            console.log(`Server is running on http://localhost:${port}`);
-        });
-
-        // Handle cleanup on server shutdown
-        process.on('SIGINT', async () => {
-            process.exit();
-        });
-    } catch (error) {
-        console.error('Failed to initialize backend:', error);
-        process.exit(1);
-    }
-})();
 
 
 app.get('/swiggy/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
+        const houseId = req.query.house_identifier as string;
 
-        if (!query) {
-            return res.status(400).json({ error: 'Search query is required' });
+        if (!query || !houseId) {
+            return res.status(400).json({ error: 'Search query and house ID are required' });
         }
 
-        const searchResult = await searchSwiggyInstamart(query);
+
+        const searchResult = await searchSwiggyInstamart(query,houseId);
         res.json(searchResult);
+        console.log('Request completed: /swiggy/api/search ================================');
     } catch (error) {
         console.error('Swiggy Instamart search error:', error);
         res.status(500).json({ error: 'Internal server error' });
+        console.log('Request failed: /swiggy/api/search ================================');
     }
 });
 
@@ -337,13 +287,69 @@ app.post('/text-to-cart', async (req: Request<{}, {}, TextQuery>, res: Response)
 
         const response = await processCartText(cart);
         res.json({ response: response.content });
+        console.log('Request completed: /text-to-cart ================================');
     } catch (error) {
         console.error('Text processing error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+        console.log('Request failed: /text-to-cart ================================');
+    }
+});
+
+// Add Swiggy process-cart endpoint
+app.post('/swiggy/api/process-cart', async (req: Request, res: Response) => {
+    try {
+        const { cart, house_identifier } = req.body;
+
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            return res.status(400).json({
+                error: 'Valid cart data is required'
+            });
+        }
+
+        if (!house_identifier) {
+            return res.status(400).json({
+                error: 'House ID is required'
+            });
+        }
+
+        const result = await processSwiggyCart(cart, house_identifier);
+        res.json(result);
+        console.log('Request completed: /swiggy/api/process-cart ================================');
+    } catch (error) {
+        console.error('Swiggy cart processing error:', error);
         res.status(500).json({
             error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
+        console.log('Request failed: /swiggy/api/process-cart ================================');
     }
 });
 
+(async () => {
+    try {
+
+        // await initializeBlinkitCart(browser);
+
+        app.listen(port, () => {
+            console.log(`Server is running on http://localhost:${port}`);
+        });
+
+        // Handle cleanup on server shutdown
+        process.on('SIGINT', async () => {
+            process.exit();
+        });
+    } catch (error) {
+        console.error('Failed to initialize backend:', error);
+        process.exit(1);
+    }
+})();
+
 export default app;
+
+
+
+
+

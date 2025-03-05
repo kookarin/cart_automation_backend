@@ -34,7 +34,10 @@ const houseCookies = require('./config/house-cookies.json') as HouseCookies;
 export async function processCartL(house_identifier: string, cart: CartItem[]): Promise<CartProcessResult> {
     try {
         // Get cookie from Supabase
-        const cookie = await getCookieForHouse(house_identifier);
+        const resp = await getCookieForHouse(house_identifier,'Licious');
+        const cookie = resp[0];
+        const buildId = resp[1];
+        
 
         console.log('Processing cart for house:', house_identifier);
         console.log('Cart items:', cart);
@@ -50,7 +53,7 @@ export async function processCartL(house_identifier: string, cart: CartItem[]): 
         // Process each cart item sequentially
         for (const item of cart) {
             try {
-                const result = await processCartItemL(item, cookie);
+                const result = await processCartItemL(item, cookie, buildId);
                 results.push(result);
             } catch (error) {
                 console.error(`Error processing ${item.ingredient}:`, error);
@@ -74,7 +77,7 @@ export async function processCartL(house_identifier: string, cart: CartItem[]): 
     }
 }
 
-async function processCartItemL(item: CartItem, cookie: string) {
+async function processCartItemL(item: CartItem, cookie: string, buildId: string) {
     console.log(`Processing item: ${item.ingredient}`);
     console.log(`Item: ${JSON.stringify(item)}`);
 
@@ -102,7 +105,7 @@ async function processCartItemL(item: CartItem, cookie: string) {
 
     // Pass cookie to searchForItem
     console.log(`Searching for ${item.ingredient}...`);
-    const { products } = await searchForItemL(item.ingredient, cookie);
+    const { products } = await searchForItemL(item.ingredient, cookie, buildId);
     console.log(`Found ${products.length} products for ${item.ingredient}`);
 
     if (products.length === 0) {

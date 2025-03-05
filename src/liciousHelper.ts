@@ -172,8 +172,7 @@ function extractProductDetails(product: LiciusProduct): TransformedProduct {
 }
 
 // Main search function
-export async function searchForItemL(query: string, cookie: string): Promise<{ products: TransformedProduct[] }> {
-    const buildId = '67a0519130d1c40017b464de'; //chintan
+export async function searchForItemL(query: string, cookie: string, buildId: string): Promise<{ products: TransformedProduct[] }> {
     const url = `https://www.licious.in/api/search?query=${encodeURIComponent(query)}&pageNum=0&hubId=4&kmlId=${buildId}`;
 
     try {
