@@ -2,10 +2,10 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { searchProduct, getFirstFiveProducts, transformProducts } from './zepto_products';
+import { searchProduct, transformProducts } from './zeptoHelper';
 import { searchForItem, getProductIncremental } from './bigbasketHelper';
 import { searchForItemL, getProductIncrementalL } from './liciousHelper';
-import { initializeBlinkit, searchBlinkit } from './blinkit_products';
+import { searchBlinkit } from './blinkit';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bigbasket';
@@ -17,6 +17,8 @@ import { getCookieForHouse } from './services/db';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger';
 import { processSwiggyCart } from './swiggy';
+import { zeptoOrder } from './zepto_master';
+import { processZeptoCart } from './zepto';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -55,8 +57,7 @@ app.get('/zepto/api/search', async (req: Request, res: Response) => {
         }
 
         const searchResult = await searchProduct(query);
-        const topFiveProducts = getFirstFiveProducts(searchResult);
-        const transformedProducts = transformProducts(topFiveProducts, query);
+        const transformedProducts = transformProducts(searchResult, query);
 
         res.json(transformedProducts);
         console.log('Request completed: /zepto/api/search ================================');
@@ -90,7 +91,7 @@ app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
 });
 
 // Licius search endpoint
-app.get('/licius/api/search', async (req: Request, res: Response) => {
+app.get('/licious/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
         const houseId = req.query.houseId as string;
@@ -325,6 +326,65 @@ app.post('/swiggy/api/process-cart', async (req: Request, res: Response) => {
             message: error instanceof Error ? error.message : 'Unknown error'
         });
         console.log('Request failed: /swiggy/api/process-cart ================================');
+    }
+});
+
+// Add new endpoint for Zepto order processing
+app.post('/zepto/api/make_cart', async (req: Request, res: Response) => {
+    try {
+        const { house_id } = req.body;
+
+        if (!house_id) {
+            return res.status(400).json({
+                error: 'House ID is required'
+            });
+        }
+
+        await zeptoOrder(house_id);
+        res.json({ 
+            status: 'success',
+            message: 'Zepto order processing completed'
+        });
+        console.log('Request completed: /zepto/api/process-cart ================================');
+
+    } catch (error) {
+        console.error('Zepto order processing error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+        console.log('Request failed: /zepto/api/process-cart ================================');
+    }
+});
+
+// Add new endpoint for testing Zepto cart processing
+app.post('/zepto/api/process-cart-test', async (req: Request, res: Response) => {
+    try {
+        const { cart, house_identifier } = req.body;
+
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            return res.status(400).json({
+                error: 'Valid cart data is required'
+            });
+        }
+
+        if (!house_identifier) {
+            return res.status(400).json({
+                error: 'House identifier is required'
+            });
+        }
+
+        const result = await processZeptoCart(house_identifier, cart);
+        res.json(result);
+        console.log('Request completed: /zepto/api/process-cart-test ================================');
+
+    } catch (error) {
+        console.error('Zepto cart processing error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+        console.log('Request failed: /zepto/api/process-cart-test ================================');
     }
 });
 

@@ -1,3 +1,5 @@
+import { Builder, By } from 'selenium-webdriver';
+import chrome from 'selenium-webdriver/chrome';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import fs from 'fs';
@@ -31,6 +33,43 @@ const groceryItems: string[] = [
     "dal"
     // Add more items as needed
 ];
+
+async function searchBlinkit(query: string) {
+    const options = new chrome.Options();
+    options.addArguments('--headless');
+    
+    const driver = await new Builder()
+        .forBrowser('chrome')
+        .setChromeOptions(options)
+        .build();
+
+    try {
+        // First load the page to get cookies
+        await driver.get('https://blinkit.com');
+        
+        // Execute the fetch request in the browser context
+        const response = await driver.executeScript(`
+            return fetch('https://blinkit.com/v1/layout/search?q=${encodeURIComponent(query)}&search_type=type_to_search', {
+                headers: {
+                    'accept': '*/*',
+                    'access_token': 'v2::f29a64bc-a998-42cc-8913-761d1c0ca11a',
+                    'app_client': 'consumer_web',
+                    'app_version': '1010101010',
+                    'auth_key': 'c761ec3633c22afad934fb17a66385c1c06c5472b4898b866b7306186d0bb477',
+                    'content-type': 'application/json',
+                    'device_id': '6cb0ce9b-938e-475a-9a8f-764b0b0030c9',
+                    'lat': '28.474679',
+                    'lon': '77.1048978',
+                    'priority': 'u=1, i'
+                }
+            }).then(res => res.json());
+        `);
+
+        return response;
+    } finally {
+        await driver.quit();
+    }
+}
 
 (async () => {
     const browser = await puppeteer.launch({ headless: true });
@@ -77,3 +116,5 @@ const groceryItems: string[] = [
     console.log('All search results saved to blinkit_response_list.json');
     await browser.close();
 })();
+
+export { searchBlinkit };

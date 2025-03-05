@@ -90,3 +90,35 @@ export async function getCookieForHouse(houseId: string, platform: string) {
         return data[0].cookies;
     }
 }
+
+interface PicklistItem {
+    ingredient_name: string;
+    ingredient_url: string;
+    ingredient_packSize: string;
+    required_qty: number;
+    house_id: number;
+    platform: string;
+    product_id: string;
+}
+
+export async function insertZeptoPicklistItem(
+    item: PicklistItem
+): Promise<void> {
+    const { data, error } = await supabase
+        .from('grocery_picklist_p2')
+        .insert([{
+            ingredient_name: item.ingredient_name,
+            ingredient_url: `https://www.zeptonow.com/pn/${item.ingredient_name.toLowerCase().replace(/\s+/g, '-')}/pvid/${item.product_id}`,
+            ingredient_packSize: item.ingredient_packSize,
+            required_qty: item.required_qty,
+            house_id: item.house_id,
+            is_ordered: false,
+            platform: 'Zepto',
+            multipack: 'no'
+        }]);
+
+    if (error) {
+        console.error('Error inserting picklist item:', error);
+        throw new Error(`Failed to insert picklist item: ${error.message}`);
+    }
+}

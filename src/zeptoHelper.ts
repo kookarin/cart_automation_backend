@@ -32,6 +32,7 @@ interface SearchPayload {
 interface ProductVariant {
     mrp: number;
     formattedPacksize: string;
+    id: string;
 }
 
 interface Product {
@@ -65,7 +66,7 @@ interface SearchResult {
     }>;
 }
 
-export async function searchProduct(query: string): Promise<SearchResult> {
+export async function searchProduct(query: string): Promise<ProductItem[]> {
     logger.info(`Initiating search for query: "${query}"`);
     const url = 'https://api.zepto.com/api/v3/search';
     const payload: SearchPayload = {
@@ -124,37 +125,22 @@ export async function searchProduct(query: string): Promise<SearchResult> {
     try {
         const res = await fetch(url, options);
         const responseBody = await res.text();
+        const searchResult: SearchResult = JSON.parse(responseBody);
         
-        // Write response to a file with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = path.join(__dirname, '..', 'logs', `zepto_response_${timestamp}.txt`);
+        // Extract products directly using the logic from getFirstFiveProducts
+        const allProducts: ProductItem[] = [];
+        searchResult?.layout?.forEach((widget) => {
+            if (widget.widgetId === "PRODUCT_GRID") {
+                const items = widget?.data?.resolver?.data?.items || [];
+                allProducts.push(...items);
+            }
+        });
         
-        // Create logs directory if it doesn't exist
-        if (!fs.existsSync(path.join(__dirname, '..', 'logs'))) {
-            fs.mkdirSync(path.join(__dirname, '..', 'logs'));
-        }
-        
-        fs.writeFileSync(filename, responseBody);
-        logger.info(`Zepto response for "${query}" written to ${filename}`);
-        
-        // Parse the response text back to JSON
-        return JSON.parse(responseBody);
+        return allProducts;
     } catch (error) {
         logger.error(`Error fetching query "${query}":`, error);
-        return {};
+        return [];
     }
-}
-
-export function getFirstFiveProducts(searchResult: SearchResult): ProductItem[] {
-    const allProducts: ProductItem[] = [];
-    searchResult?.layout?.forEach((widget) => {
-        if (widget.widgetId === "PRODUCT_GRID") {
-            const items = widget?.data?.resolver?.data?.items || [];
-            allProducts.push(...items);
-        }
-    });
-    // return allProducts.slice(0, 5);
-    return allProducts;
 }
 
 interface TransformedProduct {
@@ -176,7 +162,7 @@ export function transformProducts(products: ProductItem[], itemName: string): { 
             const price = item.productResponse.discountedSellingPrice || item.productResponse.sellingPrice;
             const discount = item.productResponse.discountPercent;
             return {
-                product_id: product.id,
+                product_id: variant.id,
                 name: product.name,
                 brand: product.brand,
                 unit: variant.formattedPacksize,
@@ -193,9 +179,8 @@ export async function collectGroceryProducts(groceryList: string[]): Promise<{ [
     
     for (const item of groceryList) {
         logger.info(`Processing item: ${item}`);
-        const searchResult = await searchProduct(item);
-        const topFiveProducts = getFirstFiveProducts(searchResult);
-        const transformedProducts = transformProducts(topFiveProducts, item);
+        const products = await searchProduct(item);
+        const transformedProducts = transformProducts(products, item);
         Object.assign(results, transformedProducts);
     }
     
