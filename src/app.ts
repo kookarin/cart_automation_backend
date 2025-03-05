@@ -44,7 +44,7 @@ app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'OK' });
 });
 
-// Search products endpoint
+Search products endpoint
 app.get('/zepto/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;

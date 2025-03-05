@@ -43,7 +43,7 @@ export async function getCookieForHouse(houseId: string) {
         .select('*')
         .eq('bigbasket_identifier', houseId);
 
-    // console.log('All matching rows:', checkData);
+    console.log('All matching rows:', checkData);
 
     if (checkError) {
         console.error('Error checking data:', checkError);
