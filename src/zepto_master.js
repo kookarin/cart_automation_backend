@@ -15,9 +15,10 @@ async function zeptoOrder(houseId) {  // Add parameters as needed
     // fetch data from picklist
     const groceryPicklist = await supabase
         .from('grocery_picklist_p2')
-        .select('*')
+        .select('*, house!inner(delivery_ph_no,id)')
         .eq('house_id', houseId)  // Use the passed houseId
         .eq('is_ordered', false)
+        .eq('platform', 'Zepto')
         ;
 // creating a list of ingredients
     console.log(groceryPicklist.data);
@@ -155,7 +156,6 @@ async function zeptoOrder(houseId) {  // Add parameters as needed
                 await driver.executeScript("arguments[0].click();", increaseButton);
               }
 
-              console.log('before update');
 
               // update the record in grocery_picklist
               await supabase
@@ -163,9 +163,10 @@ async function zeptoOrder(houseId) {  // Add parameters as needed
                 .update({ is_ordered: true }) // Set is_ordered to true
                 .eq('house_id', house_id) // Condition for house_id
                 .eq('ingredient_name', ingredient_name)
+                .eq('platform', 'Zepto')
                 .eq('is_ordered', false)
               ;
-              console.log('after update');
+
 
               // upload record to grocery_platform_order #################################
               const newEntry = {
@@ -197,7 +198,7 @@ async function zeptoOrder(houseId) {  // Add parameters as needed
           console.error(`Error: ${error}`);
       } finally {
           // Close the browser after a delay
-          // setTimeout(() => driver.quit(), 5000);
+          setTimeout(() => driver.quit(), 2000);
       }
     }
     console.log('Code ended');

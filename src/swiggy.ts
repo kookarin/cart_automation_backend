@@ -28,7 +28,8 @@ export async function processSwiggyCart(cart: CartItem[], houseId: string): Prom
         }
 
         // Get cookie from database instead of JSON file
-        const cookie = await getCookieForHouse(houseId,'Swiggy');
+        const cookieData = await getCookieForHouse(houseId,'Swiggy');
+        const cookie = cookieData[0].cookie;
         console.log('Cookie retrieved for house:', houseId);
         
         const results = [];

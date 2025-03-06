@@ -5,7 +5,7 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { searchProduct, transformProducts } from './zeptoHelper';
 import { searchForItem, getProductIncremental } from './bigbasketHelper';
 import { searchForItemL, getProductIncrementalL } from './liciousHelper';
-import { searchBlinkit } from './blinkit';
+import { searchBlinkit,initializeBlinkit } from './blinkitHelper';
 import { Browser } from 'puppeteer';
 import { selectOptimalProducts } from './ai-product-selector';
 import { processCart } from './bigbasket';
@@ -19,6 +19,8 @@ import { swaggerDocument } from './config/swagger';
 import { processSwiggyCart } from './swiggy';
 import { zeptoOrder } from './zepto_master';
 import { processZeptoCart } from './zepto';
+import { processBlinkitCart } from './blinkit';
+import { blinkitOrder } from './blinkit_master';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -52,11 +54,20 @@ app.get('/zepto/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
 
-        if (!query) {
-            return res.status(400).json({ error: 'Search query is required' });
+        const houseId = req.query.houseId as string;
+
+        if (!query || !houseId) {
+            return res.status(400).json({ error: 'Search query and house ID are required' });
         }
 
-        const searchResult = await searchProduct(query);
+        // Get cookie from database
+        const cookieData = await getCookieForHouse(houseId,'Zepto');
+        const data = cookieData[0] as { cookie: any; store_id: any; store_ids: any };
+        const cookie = data.cookie;
+        const store_id = data.store_id;
+        const store_ids = data.store_ids;
+
+        const searchResult = await searchProduct(query, cookie,store_id, store_ids);
         const transformedProducts = transformProducts(searchResult, query);
 
         res.json(transformedProducts);
@@ -79,7 +90,8 @@ app.get('/bigbasket/api/search', async (req: Request, res: Response) => {
         }
 
         // Get cookie from database
-        const cookie = await getCookieForHouse(houseId,'Bigbasket');
+        const cookieData = await getCookieForHouse(houseId,'Bigbasket');
+        const cookie = cookieData[0].cookie;
         const searchResult = await searchForItem(query, cookie);
         res.json(searchResult);
         console.log('Request completed: /bigbasket/api/search ================================');
@@ -101,9 +113,10 @@ app.get('/licious/api/search', async (req: Request, res: Response) => {
         }
 
         // Get cookie from database
-        const db_resp = await getCookieForHouse(houseId,'Licious');
-        const cookie = db_resp[0];
-        const buildId = db_resp[1];
+        const cookieData = await getCookieForHouse(houseId,'Licious');
+        const data = cookieData[0] as { cookie: any; buildId: any};
+        const cookie = data.cookie;
+        const buildId = data.buildId;
         const searchResult = await searchForItemL(query, cookie, buildId);
 
 
@@ -120,12 +133,17 @@ app.get('/licious/api/search', async (req: Request, res: Response) => {
 app.get('/blinkit/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
+        const houseId = req.query.houseId as string;
 
-        if (!query) {
-            return res.status(400).json({ error: 'Search query is required' });
+        if (!query || !houseId) {
+            return res.status(400).json({ error: 'Search query and house ID are required' });
         }
 
-        const searchResult = await searchBlinkit(query);
+        // Get cookie from database
+        const cookieData = await getCookieForHouse(houseId,'Blinkit');
+        const cookie = cookieData[0].cookie;
+
+        const searchResult = await searchBlinkit(query, cookie);
         res.json(searchResult);
         console.log('Request completed: /blinkit/api/search ================================');
     } catch (error) {
@@ -150,7 +168,8 @@ app.get('/bigbasket/api/product-incremental', async (req: Request, res: Response
         }
 
         // Get cookie from database
-        const cookie = await getCookieForHouse(houseId,'Bigbasket');
+        const cookieData = await getCookieForHouse(houseId,'Bigbasket');
+        const cookie = cookieData[0].cookie;
 
         // Array to store all results
         const results = [];
@@ -358,7 +377,7 @@ app.post('/zepto/api/make_cart', async (req: Request, res: Response) => {
 });
 
 // Add new endpoint for testing Zepto cart processing
-app.post('/zepto/api/process-cart-test', async (req: Request, res: Response) => {
+app.post('/zepto/api/process-cart', async (req: Request, res: Response) => {
     try {
         const { cart, house_identifier } = req.body;
 
@@ -388,10 +407,68 @@ app.post('/zepto/api/process-cart-test', async (req: Request, res: Response) => 
     }
 });
 
+// Add Blinkit process-cart endpoint
+app.post('/blinkit/api/process-cart', async (req: Request, res: Response) => {
+    try {
+        const { cart, house_identifier } = req.body;
+
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            return res.status(400).json({
+                error: 'Valid cart data is required'
+            });
+        }
+
+        if (!house_identifier) {
+            return res.status(400).json({
+                error: 'House identifier is required'
+            });
+        }
+
+        const result = await processBlinkitCart(house_identifier, cart);
+        res.json(result);
+        console.log('Request completed: /blinkit/api/process-cart ================================');
+    } catch (error) {
+        console.error('Blinkit cart processing error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+        console.log('Request failed: /blinkit/api/process-cart ================================');
+    }
+});
+
+// Add new endpoint for Blinkit order processing
+app.post('/blinkit/api/make_cart', async (req: Request, res: Response) => {
+    try {
+        const { house_id } = req.body;
+
+        if (!house_id) {
+            return res.status(400).json({
+                error: 'House ID is required'
+            });
+        }
+
+        await blinkitOrder(house_id);
+        res.json({ 
+            status: 'success',
+            message: 'Blinkit order processing completed'
+        });
+        console.log('Request completed: /blinkit/api/make_cart ================================');
+
+    } catch (error) {
+        console.error('Blinkit order processing error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+        console.log('Request failed: /blinkit/api/make_cart ================================');
+    }
+});
+
 (async () => {
     try {
-
-        // await initializeBlinkitCart(browser);
+        browser = await puppeteer.launch({ headless: true });
+        await initializeBlinkit(browser);
 
         app.listen(port, () => {
             console.log(`Server is running on http://localhost:${port}`);
@@ -399,6 +476,7 @@ app.post('/zepto/api/process-cart-test', async (req: Request, res: Response) => 
 
         // Handle cleanup on server shutdown
         process.on('SIGINT', async () => {
+            await browser.close();
             process.exit();
         });
     } catch (error) {

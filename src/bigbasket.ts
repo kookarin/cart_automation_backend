@@ -16,25 +16,11 @@ interface CartProcessResult {
     results: any[];
 }
 
-interface HouseCookie {
-    cookie: string;
-    description: string;
-}
-
-interface HouseCookies {
-    [key: string]: {
-        cookie: string;
-        description: string;
-    };
-}
-
-// If you need type safety, you can type assert the import:
-const houseCookies = require('./config/house-cookies.json') as HouseCookies;
-
 export async function processCart(house_identifier: string, cart: CartItem[]): Promise<CartProcessResult> {
     try {
         // Get cookie from Supabase
-        const cookie = await getCookieForHouse(house_identifier,'Bigbasket');
+        const cookieData = await getCookieForHouse(house_identifier,'Bigbasket');
+        const cookie = cookieData[0].cookie;
 
         console.log('Processing cart for house:', house_identifier);
         console.log('Cart items:', cart);

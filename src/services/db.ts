@@ -14,15 +14,11 @@ export const supabase = createClient(
 
 // Function to get all rows
 export async function getAllCookies() {
-    // console.log('Supabase URL:', process.env.SUPABASE_URL);
-    // console.log('Using anon key:', process.env.SUPABASE_ANON_KEY?.substring(0, 10) + '...');
+
 
     const { data, error } = await supabase
         .from('phone_house_mapping')
         .select('*');
-
-    // console.log('All rows in database:', data);
-    // console.log('Any error:', error);
 
     if (error) {
         throw new Error(`Failed to fetch all cookies: ${error.message}`);
@@ -72,8 +68,7 @@ export async function getCookieForHouse(houseId: string, platform: string) {
         .eq('house_id', houseId)
         .eq('platform', platform)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .order('created_at', { ascending: false });
 
     if (error) {
         console.error('Error fetching cookie:', error);
@@ -83,11 +78,24 @@ export async function getCookieForHouse(houseId: string, platform: string) {
     if (!data || data.length === 0) {
         throw new Error(`No active cookie found for house: ${houseId} on ${platform} platform`);
     }
-    if(platform === 'Licious'){
-        return [data[0].cookies,data[0].build_id];
+
+    if (platform === 'Licious') {
+        return [{
+            cookie: data[0].cookies,
+            build_id: data[0].build_id
+        }];
     }
-    else{
-        return data[0].cookies;
+    if (platform === 'Zepto') {
+        return [{
+            cookie: data[0].cookies,
+            store_id: data[0].store_id,
+            store_ids: data[0].store_ids
+        }];
+    }
+    else {
+        return [{
+            cookie: data[0].cookies
+        }];
     }
 }
 
@@ -114,6 +122,34 @@ export async function insertZeptoPicklistItem(
             house_id: item.house_id,
             is_ordered: false,
             platform: 'Zepto',
+            multipack: 'no'
+        }]);
+
+    if (error) {
+        console.error('Error inserting picklist item:', error);
+        throw new Error(`Failed to insert picklist item: ${error.message}`);
+    }
+}
+
+export async function insertBlinkitPicklistItem(
+    item: {
+        ingredient_name: string;
+        ingredient_packSize: string;
+        required_qty: number;
+        house_id: number;
+        product_id: string;
+    }
+): Promise<void> {
+    const { error } = await supabase
+        .from('grocery_picklist_p2')
+        .insert([{
+            ingredient_name: item.ingredient_name,
+            ingredient_url: `https://blinkit.com/prn/${item.ingredient_name.toLowerCase().replace(/\s+/g, '-')}/prid/${item.product_id}`,
+            ingredient_packSize: item.ingredient_packSize,
+            required_qty: item.required_qty,
+            house_id: item.house_id,
+            is_ordered: false,
+            platform: 'Blinkit',
             multipack: 'no'
         }]);
 

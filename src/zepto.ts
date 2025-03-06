@@ -2,6 +2,7 @@ import { searchProduct, transformProducts } from './zeptoHelper';
 import { selectZeptoProducts } from './ai-product-selector-zepto';
 import { insertZeptoPicklistItem } from './services/db';
 import { zeptoOrder } from './zepto_master';
+import { getCookieForHouse } from './services/db';
 
 interface CartItem {
     ingredient: string;
@@ -17,6 +18,13 @@ interface CartProcessResult {
 
 export async function processZeptoCart(house_identifier: number, cart: CartItem[]): Promise<CartProcessResult> {
     try {
+        // Get cookie and store IDs from database
+        const cookieData = await getCookieForHouse(house_identifier.toString(),'Zepto');
+        const data = cookieData[0] as { cookie: any; store_id: any; store_ids: any };
+        const cookie = data.cookie;
+        const store_id = data.store_id;
+        const store_ids = data.store_ids;
+
         console.log('Processing Zepto cart for house:', house_identifier);
         console.log('Cart items:', cart);
 
@@ -29,7 +37,8 @@ export async function processZeptoCart(house_identifier: number, cart: CartItem[
 
         for (const item of cart) {
             try {
-                const result = await processCartItem(item, house_identifier);
+                // Pass store IDs along with cookie
+                const result = await processCartItem(item, house_identifier, cookie, store_id, store_ids);
                 results.push(result);
             } catch (error) {
                 console.error(`Error processing ${item.ingredient}:`, error);
@@ -57,7 +66,7 @@ export async function processZeptoCart(house_identifier: number, cart: CartItem[
     }
 }
 
-async function processCartItem(item: CartItem, house_identifier: number) {
+async function processCartItem(item: CartItem, house_identifier: number, cookie: string, store_id: string, store_ids: string) {
     console.log(`Processing item: ${item.ingredient}`);
 
     // Extract quantity value and unit
@@ -78,7 +87,7 @@ async function processCartItem(item: CartItem, house_identifier: number) {
     }
 
     console.log(`Searching for ${item.ingredient}...`);
-    const products = await searchProduct(item.ingredient);
+    const products = await searchProduct(item.ingredient, cookie, store_id, store_ids);
     const transformedProducts = transformProducts(products, item.ingredient)[item.ingredient];
 
 

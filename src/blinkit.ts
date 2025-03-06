@@ -1,120 +1,121 @@
-import { Builder, By } from 'selenium-webdriver';
-import chrome from 'selenium-webdriver/chrome';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import fs from 'fs';
+import { selectBlinkitProducts } from './ai-product-selector-blinkit';
+import { searchBlinkit } from './blinkitHelper';
+import { blinkitOrder } from './blinkit_master';
+import { insertBlinkitPicklistItem, getCookieForHouse } from './services/db';
 
-// Add stealth plugin
-puppeteer.use(StealthPlugin());
-
-interface Product {
-    product_id: string;
-    name: string;
-    brand: string;
-    unit: string;
-    mrp: number;
-    price: number;
-    discount: number;
+interface CartItem {
+    ingredient: string;
+    'required quantity': string;
+    preference?: string;
 }
 
-interface BlinkitResponse {
-    products: Product[];
+interface CartProcessResult {
+    house_identifier: number;
+    overall_status: string;
+    results: any[];
 }
 
-interface AllResults {
-    [key: string]: Product[];
+async function processCartItem(item: CartItem, house_identifier: number) {
+    console.log(`Processing item: ${item.ingredient}`);
+    const cookieData = await getCookieForHouse(house_identifier.toString(),'Blinkit');
+    const cookie = cookieData[0].cookie;
+
+    // Extract quantity value and unit
+    const quantityMatch = item['required quantity']?.match(/(\d*\.?\d+)\s*([a-zA-Z]+)/);
+    let quantityValue: number;
+    let unit: string;
+
+    if (quantityMatch) {
+        quantityValue = parseFloat(quantityMatch[1]);
+        unit = quantityMatch[2];
+    } else {
+        const numberMatch = item['required quantity']?.match(/(\d*\.?\d+)/);
+        if (!numberMatch) {
+            throw new Error(`Invalid quantity format for ${item.ingredient}`);
+        }
+        quantityValue = parseFloat(numberMatch[1]);
+        unit = 'piece';
+    }
+
+    console.log(`Searching for ${item.ingredient}...`);
+    const searchResult = await searchBlinkit(item.ingredient,cookie);
+    console.log(searchResult);
+
+    const products = searchResult?.[item.ingredient];
+    console.log(products);
+    if (!products || !Array.isArray(products) || products.length === 0) {
+        throw new Error(`No products found for ${item.ingredient}`);
+    }
+
+    console.log(`Getting AI recommendations for ${item.ingredient}...`);
+    const recommendation = await selectBlinkitProducts(
+        products,
+        item.ingredient,
+        quantityValue,
+        unit,
+        item.preference === 'budget' ? 'budget' : 'value'
+    );
+
+    // Insert recommended items into picklist
+    console.log(recommendation);
+    for (const rec of recommendation) {
+        const product = products.find(p => p.product_id === rec.product_id);
+        if (product) {
+            await insertBlinkitPicklistItem({
+                ingredient_name: item.ingredient,
+                ingredient_packSize: product.unit,
+                required_qty: rec.count,
+                house_id: house_identifier,
+                product_id: rec.product_id
+            });
+        }
+    }
+
+    return {
+        ingredient: item.ingredient,
+        status: 'success',
+        recommendation
+    };
 }
 
-const groceryItems: string[] = [
-    "eggoz eggs",
-    "amul milk",
-    "bread",
-    "rice",
-    "dal"
-    // Add more items as needed
-];
-
-async function searchBlinkit(query: string) {
-    const options = new chrome.Options();
-    options.addArguments('--headless');
-    
-    const driver = await new Builder()
-        .forBrowser('chrome')
-        .setChromeOptions(options)
-        .build();
-
+export async function processBlinkitCart(house_identifier: number, cart: CartItem[]): Promise<CartProcessResult> {
     try {
-        // First load the page to get cookies
-        await driver.get('https://blinkit.com');
-        
-        // Execute the fetch request in the browser context
-        const response = await driver.executeScript(`
-            return fetch('https://blinkit.com/v1/layout/search?q=${encodeURIComponent(query)}&search_type=type_to_search', {
-                headers: {
-                    'accept': '*/*',
-                    'access_token': 'v2::f29a64bc-a998-42cc-8913-761d1c0ca11a',
-                    'app_client': 'consumer_web',
-                    'app_version': '1010101010',
-                    'auth_key': 'c761ec3633c22afad934fb17a66385c1c06c5472b4898b866b7306186d0bb477',
-                    'content-type': 'application/json',
-                    'device_id': '6cb0ce9b-938e-475a-9a8f-764b0b0030c9',
-                    'lat': '28.474679',
-                    'lon': '77.1048978',
-                    'priority': 'u=1, i'
-                }
-            }).then(res => res.json());
-        `);
+        console.log('Processing Blinkit cart for house:', house_identifier);
+        console.log('Cart items:', cart);
 
-        return response;
-    } finally {
-        await driver.quit();
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            throw new Error('Valid cart data is required');
+        }
+
+        const results = [];
+        let allSuccessful = true;
+
+        for (const item of cart) {
+            try {
+                const result = await processCartItem(item, house_identifier);
+                results.push(result);
+            } catch (error) {
+                console.error(`Error processing ${item.ingredient}:`, error);
+                results.push({
+                    ingredient: item.ingredient,
+                    status: 'failed',
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
+                allSuccessful = false;
+            }
+        }
+
+        if (allSuccessful) {
+            await blinkitOrder(house_identifier.toString());
+        }
+
+        return {
+            house_identifier,
+            overall_status: allSuccessful ? 'success' : 'partial_failure',
+            results
+        };
+    } catch (error) {
+        console.error('Cart processing error:', error);
+        throw error;
     }
 }
-
-(async () => {
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-    const allResults: AllResults = {};
-
-    await page.goto('https://blinkit.com', { waitUntil: 'networkidle2' });
-    
-    for (const item of groceryItems) {
-        console.log(`Searching for: ${item}`);
-        const response = await page.evaluate(async (query: string): Promise<BlinkitResponse> => {
-            const res = await fetch(
-                `https://blinkit.com/v6/search/products?start=0&size=5&search_type=7&q=${encodeURIComponent(query)}`,
-                {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'lat': "28.474679",
-                        'lon': "77.1048978",
-                        'Cookie':'gr_1_deviceId=6cb0ce9b-938e-475a-9a8f-764b0b0030c9; city=Banji; __cfruid=0d04a506ef3e9e5664bd1700e28d6772c0baa983-1740562361; _cfuvid=XFCoETpvBEaKL3aQGLwEj3H9LU6ZCMwLBe1IGc618U0-1740562361576-0.0.1.1-604800000; gr_1_lat=28.474679; gr_1_lon=77.1048978; gr_1_locality=Gurugram; gr_1_accessToken=v2%3A%3Af29a64bc-a998-42cc-8913-761d1c0ca11a; gr_1_landmark=undefined; __cf_bm=RNxMyC6NhsjJXSAT4llhqJ9lCSvn2rMtIbeD8FLiHYE-1740638342-1.0.1.1-RHTUgi5v2ylwsYCKhuiiT1N9BgAAOti6Si7zuYfq3h6J.ix51KwqZ0lSRpCOz0ilUOJsT79laMldkL20JcHeag'
-                    }
-                }
-            );
-
-            return await res.json();
-        }, item);
-
-        const products = response.products;
-        const parsedProducts: Product[] = products.map(product => ({
-            product_id: product.product_id,
-            name: product.name,
-            brand: product.brand,
-            unit: product.unit,
-            mrp: product.mrp,
-            price: product.price,
-            discount: product.discount
-        }));
-
-        allResults[item] = parsedProducts;
-    }
-
-    fs.writeFileSync('blinkit_response2.json', JSON.stringify(allResults, null, 2));
-    console.log('All search results saved to blinkit_response_list.json');
-    await browser.close();
-})();
-
-export { searchBlinkit };
