@@ -51,15 +51,11 @@ interface BigBasketProduct {
 }
 
 interface BigBasketResponse {
-    pageProps?: {
-        SSRData?: {
-            tabs?: Array<{
-                product_info?: {
-                    products: BigBasketProduct[];
-                };
-            }>;
+    tabs?: Array<{
+        product_info?: {
+            products: BigBasketProduct[];
         };
-    };
+    }>;
 }
 
 interface ProductDetails {
@@ -178,7 +174,7 @@ function extractProductDetails(product: BigBasketProduct): TransformedProduct {
 
 // Main search function
 export async function searchForItem(query: string, cookie: string): Promise<{ products: TransformedProduct[] }> {
-    const url = `https://www.bigbasket.com/_next/data/cn6n8UImd8SJt5t_wj2Jd/ps.json?q=${encodeURIComponent(query)}&nc=as&listing=ps`;
+    const url = `https://www.bigbasket.com/listing-svc/v2/products?type=ps&slug=${encodeURIComponent(query)}&page=1&bucket_id=28`;
 
     try {
         const response = await fetch(url, {
@@ -192,10 +188,11 @@ export async function searchForItem(query: string, cookie: string): Promise<{ pr
         
         // Log the response
         appendToLog('response', responseBody);
+        console.log(responseBody);
         
         const data = JSON.parse(responseBody) as BigBasketResponse;
 
-        const productsData = data?.pageProps?.SSRData?.tabs?.[0]?.product_info?.products;
+        const productsData = data?.tabs?.[0]?.product_info?.products;
 
         if (!productsData || !Array.isArray(productsData)) {
             console.error(`No products found for item: ${query}`);
