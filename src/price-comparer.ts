@@ -46,6 +46,15 @@ interface ComparisonResultWithSummary {
     cart_summary: CartSummary;
 }
 
+// Helper function to chunk array into smaller pieces
+function chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+}
+
 export async function compareProductPrices(
     houseId: string,
     cart: CartItem[]
@@ -59,244 +68,262 @@ export async function compareProductPrices(
         licious: { total: 0, items_found: 0, items_not_found: 0 }
     };
 
-    // Initialize results for each item
-    cart.forEach(item => {
-        results[item.ingredient] = {
-            swiggy: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
-            bigbasket: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
-            zepto: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
-            blinkit: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
-            licious: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 }
-        };
-    });
+    try {
+        // Process all items in parallel
+        await Promise.all(cart.map(async (item) => {
+            try {
+                // Initialize result for this item
+                results[item.ingredient] = {
+                    swiggy: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
+                    bigbasket: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
+                    zepto: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
+                    blinkit: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 },
+                    licious: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 }
+                };
 
-    // Process items sequentially to avoid race conditions
-    for (const item of cart) {
-        try {
-            const [quantity, unit] = item["required quantity"].split(" ");
-            
-            // Get all cookies in parallel
-            const [swiggyData, bbData, zeptoData, blinkitData, liciousData] = await Promise.all([
-                getCookieForHouse(houseId, 'Swiggy'),
-                getCookieForHouse(houseId, 'Bigbasket'),
-                getCookieForHouse(houseId, 'Zepto'),
-                getCookieForHouse(houseId, 'Blinkit'),
-                getCookieForHouse(houseId, 'Licious')
-            ]);
+                const [quantity, unit] = item["required quantity"].split(" ");
+                
+                // Get all cookies in parallel
+                console.log(`Getting cookies for ${item.ingredient}...`);
+                const [swiggyData, bbData, zeptoData, blinkitData, liciousData] = await Promise.all([
+                    getCookieForHouse(houseId, 'Swiggy'),
+                    getCookieForHouse(houseId, 'Bigbasket'),
+                    getCookieForHouse(houseId, 'Zepto'),
+                    getCookieForHouse(houseId, 'Blinkit'),
+                    getCookieForHouse(houseId, 'Licious')
+                ]);
 
-            const data = zeptoData[0] as { cookie: any; store_id: any; store_ids: any };
-            const liciousInfo = liciousData[0] as { cookie: any; buildId: any };
+                console.log(`Got cookies for ${item.ingredient}`);
+                const data = zeptoData[0] as { cookie: any; store_id: any; store_ids: any };
+                const liciousInfo = liciousData[0] as { cookie: any; buildId: any };
 
-            // Get all products in parallel
-            const [swiggyProducts, bbProducts, zeptoRawProducts, blinkitProducts, liciousProducts] = await Promise.all([
-                searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie),
-                searchForItem(item.ingredient, bbData[0].cookie),
-                searchProduct(
-                    item.ingredient, 
-                    (zeptoData[0] as { cookie: any; store_id: any; store_ids: any }).cookie,
-                    (zeptoData[0] as { cookie: any; store_id: any; store_ids: any }).store_id,
-                    (zeptoData[0] as { cookie: any; store_id: any; store_ids: any }).store_ids
-                ),
-                searchBlinkit(item.ingredient, blinkitData[0].cookie),
-                searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId)
-            ]);
+                // Get all products in parallel
+                console.log(`Searching products for ${item.ingredient}...`);
+                const [swiggyProducts, bbProducts, zeptoRawProducts, blinkitProducts, liciousProducts] = await Promise.all([
+                    searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie).catch(e => {
+                        console.error(`Swiggy search error for ${item.ingredient}:`, e);
+                        return { products: [] };
+                    }),
+                    searchForItem(item.ingredient, bbData[0].cookie).catch(e => {
+                        console.error(`BigBasket search error for ${item.ingredient}:`, e);
+                        return { products: [] };
+                    }),
+                    searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids).catch(e => {
+                        console.error(`Zepto search error for ${item.ingredient}:`, e);
+                        return [];
+                    }),
+                    searchBlinkit(item.ingredient, blinkitData[0].cookie).catch(e => {
+                        console.error(`Blinkit search error for ${item.ingredient}:`, e);
+                        return { [item.ingredient]: [] };
+                    }),
+                    searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId).catch(e => {
+                        console.error(`Licious search error for ${item.ingredient}:`, e);
+                        return { products: [] };
+                    })
+                ]);
+                console.log(`Got search results for ${item.ingredient}`);
 
-            const zeptoProducts = transformProducts(zeptoRawProducts, item.ingredient)[item.ingredient];
+                const zeptoProducts = transformProducts(zeptoRawProducts, item.ingredient)[item.ingredient];
 
-            // Run all AI selections in parallel
-            const [
-                swiggySelected,
-                bbSelected,
-                zeptoSelected,
-                blinkitSelected,
-                liciousSelected
-            ] = await Promise.all([
-                selectOptimalProductsSwiggy(
-                    swiggyProducts.products,
-                    { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
-                    item.ingredient
-                ).catch(() => null),
-                selectOptimalProductsBB(
-                    bbProducts.products,
-                    { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
-                    item.ingredient
-                ).catch(() => null),
-                selectZeptoProducts(
-                    zeptoProducts,
-                    item.ingredient,
-                    parseFloat(quantity),
-                    unit
-                ).catch(() => null),
-                selectBlinkitProducts(
-                    blinkitProducts[item.ingredient],
-                    item.ingredient,
-                    parseFloat(quantity),
-                    unit
-                ).catch(() => null),
-                selectOptimalProductsLicious(
-                    liciousProducts.products.map(p => ({ ...p, pack_desc: p.pack_desc || '' })),
-                    { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
-                    item.ingredient
-                ).catch(() => null)
-            ]);
+                // Run all AI selections in parallel
+                const [
+                    swiggySelected,
+                    bbSelected,
+                    zeptoSelected,
+                    blinkitSelected,
+                    liciousSelected
+                ] = await Promise.all([
+                    selectOptimalProductsSwiggy(
+                        swiggyProducts.products,
+                        { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                        item.ingredient
+                    ).catch(() => null),
+                    selectOptimalProductsBB(
+                        bbProducts.products,
+                        { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                        item.ingredient
+                    ).catch(() => null),
+                    selectZeptoProducts(
+                        zeptoProducts,
+                        item.ingredient,
+                        parseFloat(quantity),
+                        unit
+                    ).catch(() => null),
+                    selectBlinkitProducts(
+                        blinkitProducts[item.ingredient],
+                        item.ingredient,
+                        parseFloat(quantity),
+                        unit
+                    ).catch(() => null),
+                    selectOptimalProductsLicious(
+                        liciousProducts.products.map(p => ({ ...p, pack_desc: p.pack_desc || '' })),
+                        { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                        item.ingredient
+                    ).catch(() => null)
+                ]);
 
-            // Process Swiggy results
-            if (swiggySelected) {
-                const swiggyMatch = swiggyProducts.products.find(p => 
-                    String(p.itemId) === String(swiggySelected[0].itemId)
-                );
+                // Process Swiggy results
+                if (swiggySelected) {
+                    const swiggyMatch = swiggyProducts.products.find(p => 
+                        String(p.itemId) === String(swiggySelected[0].itemId)
+                    );
 
-                if (swiggyMatch) {
+                    if (swiggyMatch) {
+                        results[item.ingredient].swiggy = {
+                            price: swiggyMatch.price,
+                            product_name: swiggyMatch.name,
+                            weight: swiggyMatch.weight,
+                            brand: swiggyMatch.brand,
+                            available: swiggyMatch.available,
+                            count: swiggySelected[0].count
+                        };
+                        cartSummary.swiggy.total += swiggyMatch.price * swiggySelected[0].count;
+                        cartSummary.swiggy.items_found += 1;
+                    } else {
+                        cartSummary.swiggy.items_not_found += 1;
+                    }
+                } else {
                     results[item.ingredient].swiggy = {
-                        price: swiggyMatch.price,
-                        product_name: swiggyMatch.name,
-                        weight: swiggyMatch.weight,
-                        brand: swiggyMatch.brand,
-                        available: swiggyMatch.available,
-                        count: swiggySelected[0].count
+                        price: 0,
+                        product_name: 'Not found',
+                        weight: 'N/A',
+                        available: false,
+                        count: 0
                     };
-                    cartSummary.swiggy.total += swiggyMatch.price * swiggySelected[0].count;
-                    cartSummary.swiggy.items_found += 1;
-                } else {
-                    cartSummary.swiggy.items_not_found += 1;
                 }
-            } else {
-                results[item.ingredient].swiggy = {
-                    price: 0,
-                    product_name: 'Not found',
-                    weight: 'N/A',
-                    available: false,
-                    count: 0
-                };
-            }
 
-            // Process BigBasket results
-            if (bbSelected) {
-                const bbMatch = bbProducts.products.find(p => 
-                    String(p.product_id) === String(bbSelected[0].product_id)
-                );
+                // Process BigBasket results
+                if (bbSelected) {
+                    const bbMatch = bbProducts.products.find(p => 
+                        String(p.product_id) === String(bbSelected[0].product_id)
+                    );
 
-                if (bbMatch) {
+                    if (bbMatch) {
+                        results[item.ingredient].bigbasket = {
+                            price: bbMatch.price,
+                            product_name: bbMatch.name,
+                            weight: bbMatch.weight,
+                            brand: bbMatch.brand,
+                            available: bbMatch.available,
+                            count: bbSelected[0].count
+                        };
+                        cartSummary.bigbasket.total += bbMatch.price * bbSelected[0].count;
+                        cartSummary.bigbasket.items_found += 1;
+                    } else {
+                        cartSummary.bigbasket.items_not_found += 1;
+                    }
+                } else {
                     results[item.ingredient].bigbasket = {
-                        price: bbMatch.price,
-                        product_name: bbMatch.name,
-                        weight: bbMatch.weight,
-                        brand: bbMatch.brand,
-                        available: bbMatch.available,
-                        count: bbSelected[0].count
+                        price: 0,
+                        product_name: 'Not found',
+                        weight: 'N/A',
+                        available: false,
+                        count: 0
                     };
-                    cartSummary.bigbasket.total += bbMatch.price * bbSelected[0].count;
-                    cartSummary.bigbasket.items_found += 1;
-                } else {
-                    cartSummary.bigbasket.items_not_found += 1;
                 }
-            } else {
-                results[item.ingredient].bigbasket = {
-                    price: 0,
-                    product_name: 'Not found',
-                    weight: 'N/A',
-                    available: false,
-                    count: 0
-                };
-            }
 
-            // Process Zepto results
-            if (zeptoSelected) {
-                const zeptoMatch = zeptoProducts.find(p => 
-                    String(p.product_id) === String(zeptoSelected[0].product_id)
-                );
+                // Process Zepto results
+                if (zeptoSelected) {
+                    const zeptoMatch = zeptoProducts.find(p => 
+                        String(p.product_id) === String(zeptoSelected[0].product_id)
+                    );
 
-                if (zeptoMatch) {
+                    if (zeptoMatch) {
+                        results[item.ingredient].zepto = {
+                            price: zeptoMatch.price,
+                            product_name: zeptoMatch.name,
+                            weight: zeptoMatch.unit,
+                            brand: zeptoMatch.brand,
+                            available: true,
+                            count: zeptoSelected[0].count
+                        };
+                        cartSummary.zepto.total += zeptoMatch.price * zeptoSelected[0].count;
+                        cartSummary.zepto.items_found += 1;
+                    } else {
+                        cartSummary.zepto.items_not_found += 1;
+                    }
+                } else {
                     results[item.ingredient].zepto = {
-                        price: zeptoMatch.price,
-                        product_name: zeptoMatch.name,
-                        weight: zeptoMatch.unit,
-                        brand: zeptoMatch.brand,
-                        available: true,
-                        count: zeptoSelected[0].count
+                        price: 0,
+                        product_name: 'Not found',
+                        weight: 'N/A',
+                        available: false,
+                        count: 0
                     };
-                    cartSummary.zepto.total += zeptoMatch.price * zeptoSelected[0].count;
-                    cartSummary.zepto.items_found += 1;
-                } else {
-                    cartSummary.zepto.items_not_found += 1;
                 }
-            } else {
-                results[item.ingredient].zepto = {
-                    price: 0,
-                    product_name: 'Not found',
-                    weight: 'N/A',
-                    available: false,
-                    count: 0
-                };
-            }
 
-            // Process Blinkit results
-            if (blinkitSelected) {
-                const blinkitMatch = blinkitProducts[item.ingredient].find(p => 
-                    String(p.product_id) === String(blinkitSelected[0].product_id)
-                );
+                // Process Blinkit results
+                if (blinkitSelected) {
+                    const blinkitMatch = blinkitProducts[item.ingredient].find(p => 
+                        String(p.product_id) === String(blinkitSelected[0].product_id)
+                    );
 
-                if (blinkitMatch) {
+                    if (blinkitMatch) {
+                        results[item.ingredient].blinkit = {
+                            price: blinkitMatch.price,
+                            product_name: blinkitMatch.name,
+                            weight: blinkitMatch.unit,
+                            brand: blinkitMatch.brand,
+                            available: true,
+                            count: blinkitSelected[0].count
+                        };
+                        cartSummary.blinkit.total += blinkitMatch.price * blinkitSelected[0].count;
+                        cartSummary.blinkit.items_found += 1;
+                    } else {
+                        cartSummary.blinkit.items_not_found += 1;
+                    }
+                } else {
                     results[item.ingredient].blinkit = {
-                        price: blinkitMatch.price,
-                        product_name: blinkitMatch.name,
-                        weight: blinkitMatch.unit,
-                        brand: blinkitMatch.brand,
-                        available: true,
-                        count: blinkitSelected[0].count
+                        price: 0,
+                        product_name: 'Not found',
+                        weight: 'N/A',
+                        available: false,
+                        count: 0
                     };
-                    cartSummary.blinkit.total += blinkitMatch.price * blinkitSelected[0].count;
-                    cartSummary.blinkit.items_found += 1;
-                } else {
-                    cartSummary.blinkit.items_not_found += 1;
                 }
-            } else {
-                results[item.ingredient].blinkit = {
-                    price: 0,
-                    product_name: 'Not found',
-                    weight: 'N/A',
-                    available: false,
-                    count: 0
-                };
-            }
 
-            // Process Licious results
-            if (liciousSelected) {
-                const liciousMatch = liciousProducts.products.find(p => 
-                    String(p.product_id) === String(liciousSelected[0].product_id)
-                );
+                // Process Licious results
+                if (liciousSelected) {
+                    const liciousMatch = liciousProducts.products.find(p => 
+                        String(p.product_id) === String(liciousSelected[0].product_id)
+                    );
 
-                if (liciousMatch) {
+                    if (liciousMatch) {
+                        results[item.ingredient].licious = {
+                            price: liciousMatch.price,
+                            product_name: liciousMatch.name,
+                            weight: liciousMatch.weight,
+                            brand: liciousMatch.brand,
+                            available: liciousMatch.available,
+                            count: liciousSelected[0].count
+                        };
+                        cartSummary.licious.total += liciousMatch.price * liciousSelected[0].count;
+                        cartSummary.licious.items_found += 1;
+                    } else {
+                        cartSummary.licious.items_not_found += 1;
+                    }
+                } else {
                     results[item.ingredient].licious = {
-                        price: liciousMatch.price,
-                        product_name: liciousMatch.name,
-                        weight: liciousMatch.weight,
-                        brand: liciousMatch.brand,
-                        available: liciousMatch.available,
-                        count: liciousSelected[0].count
+                        price: 0,
+                        product_name: 'Not found',
+                        weight: 'N/A',
+                        available: false,
+                        count: 0
                     };
-                    cartSummary.licious.total += liciousMatch.price * liciousSelected[0].count;
-                    cartSummary.licious.items_found += 1;
-                } else {
-                    cartSummary.licious.items_not_found += 1;
                 }
-            } else {
-                results[item.ingredient].licious = {
-                    price: 0,
-                    product_name: 'Not found',
-                    weight: 'N/A',
-                    available: false,
-                    count: 0
-                };
+
+            } catch (error) {
+                console.error(`Error processing ${item.ingredient}:`, error);
             }
+        }));
 
-        } catch (error) {
-            console.error(`Error processing ${item.ingredient}:`, error);
-        }
+        return {
+            products: results,
+            cart_summary: cartSummary
+        };
+
+    } catch (error) {
+        console.error('Cart processing error:', error);
+        throw error;
     }
-
-    return {
-        products: results,
-        cart_summary: cartSummary
-    };
 } 

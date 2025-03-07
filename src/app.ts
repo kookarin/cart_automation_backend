@@ -21,7 +21,7 @@ import { zeptoOrder } from './zepto_master';
 import { processZeptoCart } from './zepto';
 import { processBlinkitCart } from './blinkit';
 import { blinkitOrder } from './blinkit_master';
-import { compareProductPrices } from './price-comparer-v2';
+import { compareProductPrices } from './price-comparer';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -470,7 +470,7 @@ app.post('/blinkit/api/make_cart', async (req: Request, res: Response) => {
 
 
 // Add this new endpoint
-app.post('/api/compare-prices-v2', async (req: Request, res: Response) => {
+app.post('/api/compare-prices', async (req: Request, res: Response) => {
     try {
         const { house_identifier, cart } = req.body;
 
@@ -491,7 +491,7 @@ app.post('/api/compare-prices-v2', async (req: Request, res: Response) => {
             status: 'success',
             data: results
         });
-        console.log('Request completed: /api/compare-prices-v2 ================================');
+        console.log('Request completed: /api/compare-prices====================');
 
     } catch (error) {
         console.error('Price comparison error:', error);
@@ -499,7 +499,7 @@ app.post('/api/compare-prices-v2', async (req: Request, res: Response) => {
             error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
-        console.log('Request failed: /api/compare-prices-v2 ================================');
+        console.log('Request failed: /api/compare-prices====================');
     }
 });
 
