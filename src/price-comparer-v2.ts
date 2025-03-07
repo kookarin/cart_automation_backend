@@ -33,56 +33,99 @@ interface CartItem {
     preference: string;
 }
 
+interface CartSummary {
+    [platform: string]: {
+        total: number;
+        items_found: number;
+        items_not_found: number;
+    };
+}
+
+interface ComparisonResultWithSummary {
+    products: ComparisonResult;
+    cart_summary: CartSummary;
+}
+
 export async function compareProductPrices(
     houseId: string,
     cart: CartItem[]
-): Promise<ComparisonResult> {
+): Promise<ComparisonResultWithSummary> {
     const results: ComparisonResult = {};
+    const cartSummary: CartSummary = {
+        swiggy: { total: 0, items_found: 0, items_not_found: 0 },
+        bigbasket: { total: 0, items_found: 0, items_not_found: 0 },
+        zepto: { total: 0, items_found: 0, items_not_found: 0 },
+        blinkit: { total: 0, items_found: 0, items_not_found: 0 },
+        licious: { total: 0, items_found: 0, items_not_found: 0 }
+    };
 
     for (const item of cart) {
         try {
-            // Extract quantity and unit from "required quantity"
             const [quantity, unit] = item["required quantity"].split(" ");
             
-            // Get cookies for all platforms
-            const swiggyData = await getCookieForHouse(houseId, 'Swiggy');
-            const bbData = await getCookieForHouse(houseId, 'Bigbasket');
-            const zeptoData = await getCookieForHouse(houseId, 'Zepto');
-            const blinkitData = await getCookieForHouse(houseId, 'Blinkit');
-            const liciousData = await getCookieForHouse(houseId, 'Licious');
-            
-            // Add type assertion for Zepto data
+            // Get all cookies in parallel
+            const [swiggyData, bbData, zeptoData, blinkitData, liciousData] = await Promise.all([
+                getCookieForHouse(houseId, 'Swiggy'),
+                getCookieForHouse(houseId, 'Bigbasket'),
+                getCookieForHouse(houseId, 'Zepto'),
+                getCookieForHouse(houseId, 'Blinkit'),
+                getCookieForHouse(houseId, 'Licious')
+            ]);
+
             const data = zeptoData[0] as { cookie: any; store_id: any; store_ids: any };
             const liciousInfo = liciousData[0] as { cookie: any; buildId: any };
-            
-            // Search on all platforms
-            const swiggyProducts = await searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie);
-            const bbProducts = await searchForItem(item.ingredient, bbData[0].cookie);
-            const zeptoRawProducts = await searchProduct(
-                item.ingredient, 
-                data.cookie,
-                data.store_id, 
-                data.store_ids
-            );
-            const blinkitProducts = await searchBlinkit(item.ingredient, blinkitData[0].cookie);
-            const liciousProducts = await searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId);
+
+            // Get all products in parallel
+            const [swiggyProducts, bbProducts, zeptoRawProducts, blinkitProducts, liciousProducts] = await Promise.all([
+                searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie),
+                searchForItem(item.ingredient, bbData[0].cookie),
+                searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids),
+                searchBlinkit(item.ingredient, blinkitData[0].cookie),
+                searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId)
+            ]);
 
             const zeptoProducts = transformProducts(zeptoRawProducts, item.ingredient)[item.ingredient];
-
             results[item.ingredient] = {};
 
-            // Process Swiggy results
-            try {
-                const swiggySelected = await selectOptimalProductsSwiggy(
+            // Run all AI selections in parallel
+            const [
+                swiggySelected,
+                bbSelected,
+                zeptoSelected,
+                blinkitSelected,
+                liciousSelected
+            ] = await Promise.all([
+                selectOptimalProductsSwiggy(
                     swiggyProducts.products,
-                    { 
-                        quantity: parseFloat(quantity), 
-                        unit: unit,
-                        preferences: item.preference ? [item.preference] : []
-                    },
+                    { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
                     item.ingredient
-                );
+                ).catch(() => null),
+                selectOptimalProductsBB(
+                    bbProducts.products,
+                    { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                    item.ingredient
+                ).catch(() => null),
+                selectZeptoProducts(
+                    zeptoProducts,
+                    item.ingredient,
+                    parseFloat(quantity),
+                    unit
+                ).catch(() => null),
+                selectBlinkitProducts(
+                    blinkitProducts[item.ingredient],
+                    item.ingredient,
+                    parseFloat(quantity),
+                    unit
+                ).catch(() => null),
+                selectOptimalProductsLicious(
+                    liciousProducts.products.map(p => ({ ...p, pack_desc: p.pack_desc || '' })),
+                    { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                    item.ingredient
+                ).catch(() => null)
+            ]);
 
+            // Process Swiggy results
+            if (swiggySelected) {
                 const swiggyMatch = swiggyProducts.products.find(p => 
                     String(p.itemId) === String(swiggySelected[0].itemId)
                 );
@@ -96,9 +139,12 @@ export async function compareProductPrices(
                         available: swiggyMatch.available,
                         count: swiggySelected[0].count
                     };
+                    cartSummary.swiggy.total += swiggyMatch.price * swiggySelected[0].count;
+                    cartSummary.swiggy.items_found += 1;
+                } else {
+                    cartSummary.swiggy.items_not_found += 1;
                 }
-            } catch (error) {
-                console.error(`Error processing Swiggy for ${item.ingredient}:`, error);
+            } else {
                 results[item.ingredient].swiggy = {
                     price: 0,
                     product_name: 'Not found',
@@ -109,17 +155,7 @@ export async function compareProductPrices(
             }
 
             // Process BigBasket results
-            try {
-                const bbSelected = await selectOptimalProductsBB(
-                    bbProducts.products,
-                    { 
-                        quantity: parseFloat(quantity), 
-                        unit: unit,
-                        preferences: item.preference ? [item.preference] : []
-                    },
-                    item.ingredient
-                );
-
+            if (bbSelected) {
                 const bbMatch = bbProducts.products.find(p => 
                     String(p.product_id) === String(bbSelected[0].product_id)
                 );
@@ -133,9 +169,12 @@ export async function compareProductPrices(
                         available: bbMatch.available,
                         count: bbSelected[0].count
                     };
+                    cartSummary.bigbasket.total += bbMatch.price * bbSelected[0].count;
+                    cartSummary.bigbasket.items_found += 1;
+                } else {
+                    cartSummary.bigbasket.items_not_found += 1;
                 }
-            } catch (error) {
-                console.error(`Error processing BigBasket for ${item.ingredient}:`, error);
+            } else {
                 results[item.ingredient].bigbasket = {
                     price: 0,
                     product_name: 'Not found',
@@ -146,14 +185,7 @@ export async function compareProductPrices(
             }
 
             // Process Zepto results
-            try {
-                const zeptoSelected = await selectZeptoProducts(
-                    zeptoProducts,
-                    item.ingredient,
-                    parseFloat(quantity),
-                    unit
-                );
-
+            if (zeptoSelected) {
                 const zeptoMatch = zeptoProducts.find(p => 
                     String(p.product_id) === String(zeptoSelected[0].product_id)
                 );
@@ -167,9 +199,12 @@ export async function compareProductPrices(
                         available: true,
                         count: zeptoSelected[0].count
                     };
+                    cartSummary.zepto.total += zeptoMatch.price * zeptoSelected[0].count;
+                    cartSummary.zepto.items_found += 1;
+                } else {
+                    cartSummary.zepto.items_not_found += 1;
                 }
-            } catch (error) {
-                console.error(`Error processing Zepto for ${item.ingredient}:`, error);
+            } else {
                 results[item.ingredient].zepto = {
                     price: 0,
                     product_name: 'Not found',
@@ -180,14 +215,7 @@ export async function compareProductPrices(
             }
 
             // Process Blinkit results
-            try {
-                const blinkitSelected = await selectBlinkitProducts(
-                    blinkitProducts[item.ingredient],
-                    item.ingredient,
-                    parseFloat(quantity),
-                    unit
-                );
-
+            if (blinkitSelected) {
                 const blinkitMatch = blinkitProducts[item.ingredient].find(p => 
                     String(p.product_id) === String(blinkitSelected[0].product_id)
                 );
@@ -201,9 +229,12 @@ export async function compareProductPrices(
                         available: true,
                         count: blinkitSelected[0].count
                     };
+                    cartSummary.blinkit.total += blinkitMatch.price * blinkitSelected[0].count;
+                    cartSummary.blinkit.items_found += 1;
+                } else {
+                    cartSummary.blinkit.items_not_found += 1;
                 }
-            } catch (error) {
-                console.error(`Error processing Blinkit for ${item.ingredient}:`, error);
+            } else {
                 results[item.ingredient].blinkit = {
                     price: 0,
                     product_name: 'Not found',
@@ -214,20 +245,7 @@ export async function compareProductPrices(
             }
 
             // Process Licious results
-            try {
-                const liciousSelected = await selectOptimalProductsLicious(
-                    liciousProducts.products.map(p => ({
-                        ...p,
-                        pack_desc: p.pack_desc || ''  // Ensure pack_desc is always a string
-                    })),
-                    { 
-                        quantity: parseFloat(quantity), 
-                        unit: unit,
-                        preferences: item.preference ? [item.preference] : []
-                    },
-                    item.ingredient
-                );
-
+            if (liciousSelected) {
                 const liciousMatch = liciousProducts.products.find(p => 
                     String(p.product_id) === String(liciousSelected[0].product_id)
                 );
@@ -241,9 +259,12 @@ export async function compareProductPrices(
                         available: liciousMatch.available,
                         count: liciousSelected[0].count
                     };
+                    cartSummary.licious.total += liciousMatch.price * liciousSelected[0].count;
+                    cartSummary.licious.items_found += 1;
+                } else {
+                    cartSummary.licious.items_not_found += 1;
                 }
-            } catch (error) {
-                console.error(`Error processing Licious for ${item.ingredient}:`, error);
+            } else {
                 results[item.ingredient].licious = {
                     price: 0,
                     product_name: 'Not found',
@@ -295,5 +316,8 @@ export async function compareProductPrices(
         }
     }
 
-    return results;
+    return {
+        products: results,
+        cart_summary: cartSummary
+    };
 } 
