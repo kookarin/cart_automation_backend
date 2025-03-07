@@ -21,6 +21,7 @@ import { zeptoOrder } from './zepto_master';
 import { processZeptoCart } from './zepto';
 import { processBlinkitCart } from './blinkit';
 import { blinkitOrder } from './blinkit_master';
+import { compareProductPrices } from './price-comparer-v2';
 
 // Add stealth plugin
 puppeteer.use(StealthPlugin());
@@ -49,7 +50,7 @@ app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'OK' });
 });
 
-Search products endpoint
+
 app.get('/zepto/api/search', async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
@@ -462,6 +463,43 @@ app.post('/blinkit/api/make_cart', async (req: Request, res: Response) => {
             message: error instanceof Error ? error.message : 'Unknown error'
         });
         console.log('Request failed: /blinkit/api/make_cart ================================');
+    }
+});
+
+// Add this new endpoint
+
+
+// Add this new endpoint
+app.post('/api/compare-prices-v2', async (req: Request, res: Response) => {
+    try {
+        const { house_identifier, cart } = req.body;
+
+        if (!cart || !Array.isArray(cart) || cart.length === 0) {
+            return res.status(400).json({
+                error: 'Valid cart data is required'
+            });
+        }
+
+        if (!house_identifier) {
+            return res.status(400).json({
+                error: 'House identifier is required'
+            });
+        }
+
+        const results = await compareProductPrices(house_identifier.toString(), cart);
+        res.json({
+            status: 'success',
+            data: results
+        });
+        console.log('Request completed: /api/compare-prices-v2 ================================');
+
+    } catch (error) {
+        console.error('Price comparison error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+        console.log('Request failed: /api/compare-prices-v2 ================================');
     }
 });
 
