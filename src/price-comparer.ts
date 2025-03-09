@@ -10,6 +10,7 @@ import { selectBlinkitProducts } from "./ai-product-selector-blinkit";
 import { searchForItemL } from "./liciousHelper";
 import { selectOptimalProducts as selectOptimalProductsLicious } from "./ai-selector-licious";
 
+
 interface ProductPrice {
     price: number;
     product_name: string;
@@ -55,9 +56,29 @@ function chunkArray<T>(array: T[], size: number): T[][] {
     return chunks;
 }
 
+function parseQuantityAndUnit(quantityStr: string): [number, string] {
+    // If it's just a number, return it with 'piece' as unit
+    if (!isNaN(Number(quantityStr))) {
+        return [Number(quantityStr), 'piece'];
+    }
+
+    // Match decimal or integer number and unit, handling optional space
+    const match = quantityStr.toLowerCase().match(/^(\d*\.?\d+)\s*([a-z]+)$/);
+    
+    if (match) {
+        const quantity = Number(match[1]);
+        const unit = match[2];
+        return [quantity, unit];
+    }
+    
+    // Default fallback
+    return [1, 'piece'];
+}
+
 export async function compareProductPrices(
     houseId: string,
-    cart: CartItem[]
+    cart: CartItem[],
+    platforms: string[]
 ): Promise<ComparisonResultWithSummary> {
     const results: ComparisonResult = {};
     const cartSummary: CartSummary = {
@@ -81,7 +102,7 @@ export async function compareProductPrices(
                     licious: { price: 0, product_name: 'Not found', weight: 'N/A', available: false, count: 0 }
                 };
 
-                const [quantity, unit] = item["required quantity"].split(" ");
+                const [quantity, unit] = parseQuantityAndUnit(item["required quantity"]);
                 
                 // Get all cookies in parallel
                 console.log(`Getting cookies for ${item.ingredient}...`);
@@ -100,28 +121,29 @@ export async function compareProductPrices(
                 // Get all products in parallel
                 console.log(`Searching products for ${item.ingredient}...`);
                 const [swiggyProducts, bbProducts, zeptoRawProducts, blinkitProducts, liciousProducts] = await Promise.all([
-                    searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie).catch(e => {
+                    platforms.includes('Swiggy') ? searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie).catch(e => {
                         console.error(`Swiggy search error for ${item.ingredient}:`, e);
                         return { products: [] };
-                    }),
-                    searchForItem(item.ingredient, bbData[0].cookie).catch(e => {
+                    }) : Promise.resolve({ products: [] }),
+                    platforms.includes('Bigbasket') ? searchForItem(item.ingredient, bbData[0].cookie).catch(e => {
                         console.error(`BigBasket search error for ${item.ingredient}:`, e);
                         return { products: [] };
-                    }),
-                    searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids).catch(e => {
+                    }) : Promise.resolve({ products: [] }),
+                    platforms.includes('Zepto') ? searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids).catch(e => {
                         console.error(`Zepto search error for ${item.ingredient}:`, e);
                         return [];
-                    }),
-                    searchBlinkit(item.ingredient, blinkitData[0].cookie).catch(e => {
+                    }) : Promise.resolve([]),
+                    platforms.includes('Blinkit') ? searchBlinkit(item.ingredient, blinkitData[0].cookie).catch(e => {
                         console.error(`Blinkit search error for ${item.ingredient}:`, e);
                         return { [item.ingredient]: [] };
-                    }),
-                    searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId).catch(e => {
+                    }) : Promise.resolve({ [item.ingredient]: [] }),
+                    platforms.includes('Licious') ? searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId).catch(e => {
                         console.error(`Licious search error for ${item.ingredient}:`, e);
                         return { products: [] };
-                    })
+                    }) : Promise.resolve({ products: [] })
                 ]);
                 console.log(`Got search results for ${item.ingredient}`);
+
 
                 const zeptoProducts = transformProducts(zeptoRawProducts, item.ingredient)[item.ingredient];
 
@@ -133,31 +155,31 @@ export async function compareProductPrices(
                     blinkitSelected,
                     liciousSelected
                 ] = await Promise.all([
-                    selectOptimalProductsSwiggy(
+                    platforms.includes('Swiggy') ? selectOptimalProductsSwiggy(
                         swiggyProducts.products,
-                        { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                        { quantity, unit, preferences: item.preference ? [item.preference] : [] },
                         item.ingredient
-                    ).catch(() => null),
-                    selectOptimalProductsBB(
+                    ).catch(() => null) : Promise.resolve(null),
+                    platforms.includes('Bigbasket') ? selectOptimalProductsBB(
                         bbProducts.products,
-                        { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                        { quantity, unit, preferences: item.preference ? [item.preference] : [] },
                         item.ingredient
-                    ).catch(() => null),
-                    selectZeptoProducts(
+                    ).catch(() => null) : Promise.resolve(null),
+                    platforms.includes('Zepto') ? selectZeptoProducts(
                         zeptoProducts,
                         item.ingredient,
-                        parseFloat(quantity),
+                        quantity,
                         unit
-                    ).catch(() => null),
+                    ).catch(() => null) : Promise.resolve(null),
                     selectBlinkitProducts(
                         blinkitProducts[item.ingredient],
                         item.ingredient,
-                        parseFloat(quantity),
+                        quantity,
                         unit
                     ).catch(() => null),
                     selectOptimalProductsLicious(
                         liciousProducts.products.map(p => ({ ...p, pack_desc: p.pack_desc || '' })),
-                        { quantity: parseFloat(quantity), unit, preferences: item.preference ? [item.preference] : [] },
+                        { quantity, unit, preferences: item.preference ? [item.preference] : [] },
                         item.ingredient
                     ).catch(() => null)
                 ]);

@@ -472,7 +472,7 @@ app.post('/blinkit/api/make_cart', async (req: Request, res: Response) => {
 // Add this new endpoint
 app.post('/api/compare-prices', async (req: Request, res: Response) => {
     try {
-        const { house_identifier, cart } = req.body;
+        const { house_identifier, cart, platforms } = req.body;
 
         if (!cart || !Array.isArray(cart) || cart.length === 0) {
             return res.status(400).json({
@@ -485,8 +485,14 @@ app.post('/api/compare-prices', async (req: Request, res: Response) => {
                 error: 'House identifier is required'
             });
         }
+        if (!platforms || !Array.isArray(platforms) || platforms.length === 0) { 
+            return res.status(400).json({
+                error: 'Platforms are required'
+            });
+        }
 
-        const results = await compareProductPrices(house_identifier.toString(), cart);
+
+        const results = await compareProductPrices(house_identifier.toString(), cart, platforms);
         res.json({
             status: 'success',
             data: results
