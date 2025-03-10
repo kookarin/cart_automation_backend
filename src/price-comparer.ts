@@ -176,7 +176,7 @@ export async function compareProductPrices(
                         { quantity, unit, preferences: item.preference ? [item.preference] : [] },
                         item.ingredient
                     ).catch(() => null) : Promise.resolve(null),
-                    platforms.includes('Zepto') ? selectZeptoProducts(
+                    lowerCasePlatforms.includes('zepto') ? selectZeptoProducts(
                         zeptoProducts,
                         item.ingredient,
                         quantity,
