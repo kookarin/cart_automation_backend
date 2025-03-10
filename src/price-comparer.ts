@@ -75,6 +75,16 @@ function parseQuantityAndUnit(quantityStr: string): [number, string] {
     return [1, 'piece'];
 }
 
+const getCookieSafely = async (houseId: string, platform: string) => {
+    try {
+        const cookie = await getCookieForHouse(houseId, platform);
+        return cookie;
+    } catch (error) {
+        console.error(`Failed to get cookie for ${platform}:`, error);
+        return null;
+    }
+};
+
 export async function compareProductPrices(
     houseId: string,
     cart: CartItem[],
@@ -107,37 +117,37 @@ export async function compareProductPrices(
                 // Get all cookies in parallel
                 console.log(`Getting cookies for ${item.ingredient}...`);
                 const [swiggyData, bbData, zeptoData, blinkitData, liciousData] = await Promise.all([
-                    getCookieForHouse(houseId, 'Swiggy'),
-                    getCookieForHouse(houseId, 'Bigbasket'),
-                    getCookieForHouse(houseId, 'Zepto'),
-                    getCookieForHouse(houseId, 'Blinkit'),
-                    getCookieForHouse(houseId, 'Licious')
+                    getCookieSafely(houseId, 'Swiggy'),
+                    getCookieSafely(houseId, 'Bigbasket'),
+                    getCookieSafely(houseId, 'Zepto'),
+                    getCookieSafely(houseId, 'Blinkit'),
+                    getCookieSafely(houseId, 'Licious')
                 ]);
 
                 console.log(`Got cookies for ${item.ingredient}`);
-                const data = zeptoData[0] as { cookie: any; store_id: any; store_ids: any };
-                const liciousInfo = liciousData[0] as { cookie: any; buildId: any };
+                const data = zeptoData?.[0] as { cookie: any; store_id: any; store_ids: any } || { cookie: null, store_id: null, store_ids: null };
+                const liciousInfo = liciousData?.[0] as { cookie: any; buildId: any } || { cookie: null, buildId: null };
 
                 // Get all products in parallel
                 console.log(`Searching products for ${item.ingredient}...`);
                 const [swiggyProducts, bbProducts, zeptoRawProducts, blinkitProducts, liciousProducts] = await Promise.all([
-                    platforms.includes('Swiggy') ? searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie).catch(e => {
+                    platforms.includes('Swiggy') && swiggyData ? searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie).catch(e => {
                         console.error(`Swiggy search error for ${item.ingredient}:`, e);
                         return { products: [] };
                     }) : Promise.resolve({ products: [] }),
-                    platforms.includes('Bigbasket') ? searchForItem(item.ingredient, bbData[0].cookie).catch(e => {
+                    platforms.includes('Bigbasket') && bbData ? searchForItem(item.ingredient, bbData[0].cookie).catch(e => {
                         console.error(`BigBasket search error for ${item.ingredient}:`, e);
                         return { products: [] };
                     }) : Promise.resolve({ products: [] }),
-                    platforms.includes('Zepto') ? searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids).catch(e => {
+                    platforms.includes('Zepto') && zeptoData ? searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids).catch(e => {
                         console.error(`Zepto search error for ${item.ingredient}:`, e);
                         return [];
                     }) : Promise.resolve([]),
-                    platforms.includes('Blinkit') ? searchBlinkit(item.ingredient, blinkitData[0].cookie).catch(e => {
+                    platforms.includes('Blinkit') && blinkitData ? searchBlinkit(item.ingredient, blinkitData[0].cookie).catch(e => {
                         console.error(`Blinkit search error for ${item.ingredient}:`, e);
                         return { [item.ingredient]: [] };
                     }) : Promise.resolve({ [item.ingredient]: [] }),
-                    platforms.includes('Licious') ? searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId).catch(e => {
+                    platforms.includes('Licious') && liciousData ? searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId).catch(e => {
                         console.error(`Licious search error for ${item.ingredient}:`, e);
                         return { products: [] };
                     }) : Promise.resolve({ products: [] })
