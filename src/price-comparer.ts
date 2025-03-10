@@ -113,6 +113,7 @@ export async function compareProductPrices(
                 };
 
                 const [quantity, unit] = parseQuantityAndUnit(item["required quantity"]);
+                const lowerCasePlatforms = platforms.map(platform => platform.toLowerCase());
                 
                 // Get all cookies in parallel
                 console.log(`Getting cookies for ${item.ingredient}...`);
@@ -131,23 +132,23 @@ export async function compareProductPrices(
                 // Get all products in parallel
                 console.log(`Searching products for ${item.ingredient}...`);
                 const [swiggyProducts, bbProducts, zeptoRawProducts, blinkitProducts, liciousProducts] = await Promise.all([
-                    platforms.includes('Swiggy') && swiggyData ? searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie).catch(e => {
+                    lowerCasePlatforms.includes('swiggy') && swiggyData ? searchSwiggyInstamart(item.ingredient, swiggyData[0].cookie).catch(e => {
                         console.error(`Swiggy search error for ${item.ingredient}:`, e);
                         return { products: [] };
                     }) : Promise.resolve({ products: [] }),
-                    platforms.includes('Bigbasket') && bbData ? searchForItem(item.ingredient, bbData[0].cookie).catch(e => {
+                    lowerCasePlatforms.includes('bigbasket') && bbData ? searchForItem(item.ingredient, bbData[0].cookie).catch(e => {
                         console.error(`BigBasket search error for ${item.ingredient}:`, e);
                         return { products: [] };
                     }) : Promise.resolve({ products: [] }),
-                    platforms.includes('Zepto') && zeptoData ? searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids).catch(e => {
+                    lowerCasePlatforms.includes('zepto') && zeptoData ? searchProduct(item.ingredient, data.cookie, data.store_id, data.store_ids).catch(e => {
                         console.error(`Zepto search error for ${item.ingredient}:`, e);
                         return [];
                     }) : Promise.resolve([]),
-                    platforms.includes('Blinkit') && blinkitData ? searchBlinkit(item.ingredient, blinkitData[0].cookie).catch(e => {
+                    lowerCasePlatforms.includes('blinkit') && blinkitData ? searchBlinkit(item.ingredient, blinkitData[0].cookie).catch(e => {
                         console.error(`Blinkit search error for ${item.ingredient}:`, e);
                         return { [item.ingredient]: [] };
                     }) : Promise.resolve({ [item.ingredient]: [] }),
-                    platforms.includes('Licious') && liciousData ? searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId).catch(e => {
+                    lowerCasePlatforms.includes('licious') && liciousData ? searchForItemL(item.ingredient, liciousInfo.cookie, liciousInfo.buildId).catch(e => {
                         console.error(`Licious search error for ${item.ingredient}:`, e);
                         return { products: [] };
                     }) : Promise.resolve({ products: [] })
@@ -165,12 +166,12 @@ export async function compareProductPrices(
                     blinkitSelected,
                     liciousSelected
                 ] = await Promise.all([
-                    platforms.includes('Swiggy') ? selectOptimalProductsSwiggy(
+                    lowerCasePlatforms.includes('swiggy') ? selectOptimalProductsSwiggy(
                         swiggyProducts.products,
                         { quantity, unit, preferences: item.preference ? [item.preference] : [] },
                         item.ingredient
                     ).catch(() => null) : Promise.resolve(null),
-                    platforms.includes('Bigbasket') ? selectOptimalProductsBB(
+                    lowerCasePlatforms.includes('bigbasket') ? selectOptimalProductsBB(
                         bbProducts.products,
                         { quantity, unit, preferences: item.preference ? [item.preference] : [] },
                         item.ingredient
@@ -181,17 +182,17 @@ export async function compareProductPrices(
                         quantity,
                         unit
                     ).catch(() => null) : Promise.resolve(null),
-                    selectBlinkitProducts(
+                    lowerCasePlatforms.includes('blinkit') ? selectBlinkitProducts(
                         blinkitProducts[item.ingredient],
                         item.ingredient,
                         quantity,
                         unit
-                    ).catch(() => null),
-                    selectOptimalProductsLicious(
+                    ).catch(() => null) : Promise.resolve(null),
+                    lowerCasePlatforms.includes('licious') ? selectOptimalProductsLicious(
                         liciousProducts.products.map(p => ({ ...p, pack_desc: p.pack_desc || '' })),
                         { quantity, unit, preferences: item.preference ? [item.preference] : [] },
                         item.ingredient
-                    ).catch(() => null)
+                    ).catch(() => null) : Promise.resolve(null)
                 ]);
 
                 // Process Swiggy results
